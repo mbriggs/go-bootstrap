@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+#
+# Regenerates all generated code. The directives in gen.go are the source
+# of truth; this script exists so the workflow reads bin/<verb> like the
+# rest of the toolchain. Run after tern migrate or after adding/removing a
+# FooTx. Output is committed; bin/check fails if it drifts.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+go generate .

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#
+# The full verification gate: format, build, vet, custom analyzers, stock
+# linters, codegen drift, and the test suite against a fresh template DB.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+unformatted=$(gofmt -l . 2>/dev/null | grep -v '^tmp/' || true)
+if [ -n "$unformatted" ]; then
+  echo "gofmt needed on:"
+  echo "$unformatted"
+  exit 1
+fi
+
+go build ./...
+go vet ./...
+go run ./cmd/lint ./...
+
+if command -v golangci-lint >/dev/null; then
+  golangci-lint run ./...
+else
+  echo "warning: golangci-lint not installed, skipping stock linters" >&2
+fi
+
+# Stale = regeneration changed something the index doesn't have: untracked
+# new output (??) or a worktree modification (second status column set).
+bin/generate
+drift=$(git status --porcelain -- '*_gen.go' | grep -E '^(\?\?|.[^ ])' || true)
+if [ -n "$drift" ]; then
+  echo "generated code is stale or untracked — commit bin/generate output:"
+  echo "$drift"
+  exit 1
+fi
+
+bin/testdb
+go test ./...
+
+echo "all checks passed"

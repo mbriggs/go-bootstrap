@@ -1,0 +1,8 @@
+# Tables modelgen generates models for. The live schema is the source of
+# truth — run bin/generate after tern migrate.
+#
+# tables:
+#   - table: things
+#     package: thing
+#     type: Thing
+tables: []

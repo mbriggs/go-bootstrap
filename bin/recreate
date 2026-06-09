@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# Drops and recreates the dev database ($PGDATABASE from .env), then runs
+# migrations.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+echo "Terminating all connections to database $PGDATABASE..."
+psql -d postgres -qc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$PGDATABASE';" >/dev/null
+
+echo "Recreating database $PGDATABASE..."
+dropdb --if-exists "$PGDATABASE"
+createdb "$PGDATABASE"
+
+echo "Running migration..."
+if ls "${TERN_MIGRATIONS:-migrations}"/*.sql >/dev/null 2>&1; then
+  tern migrate
+else
+  echo "no migrations yet — database is empty"
+fi
+
+echo "Database $PGDATABASE recreated"

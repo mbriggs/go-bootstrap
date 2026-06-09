@@ -1,0 +1,15 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - misspell
+    - unconvert
+    - unparam
+  settings:
+    errcheck:
+      # Deferred closes of read-path handles; nothing actionable on failure.
+      exclude-functions:
+        - (*github.com/jackc/pgx/v5.Conn).Close
+  exclusions:
+    generated: lax

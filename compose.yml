@@ -1,0 +1,11 @@
+# Optional Postgres for machines without a native install. Credentials come
+# from .env (compose reads it automatically); bin/setup generates .env.
+services:
+  postgres:
+    image: postgres:alpine
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      - POSTGRES_USER=${PGUSER}
+      - POSTGRES_PASSWORD=${PGPASSWORD}
+      - POSTGRES_DB=${PGDATABASE}

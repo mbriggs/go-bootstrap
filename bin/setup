@@ -1,0 +1,169 @@
+#!/bin/bash
+
+# Define color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NO_COLOR='\033[0m'
+
+main() {
+  setup_package_manager
+
+  check_tool "docker" "https://docs.docker.com/get-docker/"
+  [[ "$OSTYPE" == "darwin"* ]] && check_tool "brew" "https://brew.sh"
+  check_tool "go" "https://golang.org/doc/install"
+
+  install_tool "curl"
+  install_tool "golangci-lint" "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.57.2"
+  install_tool "air" "go install github.com/cosmtrek/air@latest"
+  install_tool "goimports" "go install golang.org/x/tools/cmd/goimports@latest"
+  install_tool "tern" "go install github.com/jackc/tern/v2@latest"
+  install_tool "shellcheck"
+  install_tool "git"
+  install_tool "direnv"
+  install_tool "jq"
+  install_tool "httpie"
+  install_tool "pgcli"
+
+  install_lib "libpq"
+
+  create_env_file
+
+  print_success "Setup completed successfully."
+}
+
+# Utility function to print success messages
+print_success() {
+  echo -e "${GREEN}$1${NO_COLOR}"
+}
+
+# Utility function to print error messages and exit
+error_exit() {
+  echo -e "${RED}Error: $1${NO_COLOR}" 1>&2
+  exit 1
+}
+
+# Checks for the presence of a tool and provides an installation guide if missing
+check_tool() {
+  if ! command -v "$1" &>/dev/null; then
+    error_exit "$1 is not installed. Visit $2 for installation instructions."
+  fi
+}
+
+# Installs a tool using the determined package manager
+install_tool() {
+  local tool_name="$1"
+  local install_cmd="$2"
+
+  if [ -z "$install_cmd" ]; then
+    install_cmd="$(get_pkg_install_cmd "$tool_name")"
+  fi
+
+  if ! command -v "$tool_name" &>/dev/null; then
+    echo "Installing $tool_name..."
+    eval "$install_cmd"
+  else
+    print_success "$tool_name is already installed."
+  fi
+}
+
+# Dynamically constructs the installation command for a package
+get_pkg_install_cmd() {
+  local pkg_name="$1"
+  case $PKG_MANAGER in
+  apt) echo "sudo apt-get install -y ${pkg_name}-dev" ;;
+  yum) echo "sudo yum install -y ${pkg_name}-devel" ;;
+  brew)
+    if [[ "$pkg_name" == "libpq" ]]; then pkg_name="postgresql"; fi
+    echo "brew install $pkg_name"
+    ;;
+  *) error_exit "Unsupported package manager setup." ;;
+  esac
+}
+
+install_lib() {
+  local lib_name="$1"
+  local pkg_name # Initialize variable for adjusted package name
+
+  # Determine package name based on package manager and library naming conventions
+  case $PKG_MANAGER in
+  apt)
+    pkg_name="${lib_name}-dev"
+    if dpkg -l | grep -qw "$pkg_name"; then
+      print_success "$lib_name is already installed."
+      return
+    fi
+    ;;
+  yum)
+    pkg_name="${lib_name}-devel"
+    if yum list installed "$pkg_name" &>/dev/null; then
+      print_success "$lib_name is already installed."
+      return
+    fi
+    ;;
+  brew)
+    # Homebrew does not use the -dev or -devel postfix convention.
+    pkg_name="$lib_name"
+    if brew list --formula | grep -qw "$pkg_name"; then
+      print_success "$lib_name is already installed."
+      return
+    fi
+    ;;
+  *)
+    error_exit "Unsupported package manager."
+    ;;
+  esac
+
+  # If not already installed, proceed with installation
+  echo "Installing $lib_name..."
+  local install_cmd
+  install_cmd="$(get_pkg_install_cmd "$pkg_name")"
+  eval "$install_cmd" || error_exit "Installation of $lib_name failed."
+  print_success "$lib_name installed successfully."
+}
+
+# Detects the OS and configures the package manager accordingly
+setup_package_manager() {
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if command -v apt &>/dev/null; then
+      PKG_MANAGER="apt"
+    elif command -v yum &>/dev/null; then
+      PKG_MANAGER="yum"
+    else
+      error_exit "Unsupported Linux distribution. Your distro does not use apt or yum."
+    fi
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    if ! command -v brew &>/dev/null; then
+      error_exit "Homebrew is not installed. Please install it from https://brew.sh"
+    fi
+    PKG_MANAGER="brew"
+  else
+    error_exit "Unsupported operating system."
+  fi
+}
+
+
+# Generates .env with names derived from the module path
+create_env_file() {
+  if [ -f .env ]; then
+    print_success ".env already exists."
+    return
+  fi
+
+  local project
+  project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+
+  cat > .env <<ENVEOF
+PGUSER=$project
+PGPASSWORD=$project
+PGDATABASE=${project}_dev
+PGHOST=localhost
+PGPORT=5432
+
+TERN_MIGRATIONS=migrations
+ENVEOF
+
+  print_success "Created .env for $project."
+}
+
+# Start of the script
+main
