@@ -23,10 +23,11 @@ the enforced rules hold.
   encapsulation. Don't build "service" structs whose only job is to hold
   dependencies — that's a package wearing a costume.
 - **Globals are legitimate for thread-safe, single-instance resources** —
-  the connection pool (`db.Conn`), the logger registry. There is exactly
-  one of each per process, and threading them through every call adds
-  ceremony without information. Anything that isn't both thread-safe and
-  genuinely singular does not get to be a global.
+  the connection pool (`db.Conn`), the logger registry, the session
+  manager (`web.Sessions`). There is exactly one of each per process, and
+  threading them through every call adds ceremony without information.
+  Anything that isn't both thread-safe and genuinely singular does not get
+  to be a global.
 - **Dependency injection earns its place at seams.** A parameter exists
   because call sites genuinely vary (pool vs. transaction), never to make
   code abstractly "testable."
@@ -40,7 +41,7 @@ the enforced rules hold.
 ## Layout
 
 - **Flat root.** Packages live at the repository root (plus `web/...` for
-  HTTP). No `internal/` tree.
+  HTTP and `views/` for templ components). No `internal/` tree.
 - **Package = domain aggregate.** A thing with its own table and
   lifecycle gets a package. A mere value or projection (a wire shape)
   lives with the handler that shapes it. Don't mint a package per
@@ -80,8 +81,9 @@ alone — so here it is held by machinery.
   pool, and it's machine-written, so it cannot drift.
 - **`db.Conn` is confined** (analyzer: `connconfine`). Only generated
   delegates, `db/db.go` (bootstrap), `db/tx.go` (the transaction
-  boundary), and `package main` may reference it. Hand-written code
-  mid-call-tree takes a `db.Queryable` parameter instead.
+  boundary), `package main`, and the `webtest` harness (the composition
+  root for tests) may reference it. Hand-written code mid-call-tree takes
+  a `db.Queryable` parameter instead.
 - **A `db.Queryable` parameter must be used** (analyzer: `txparam`).
   Accepting `tx` and ignoring it is exactly how reads silently escape
   transactions.
@@ -123,6 +125,56 @@ by hand.
 - **Sentinels for branching.** `db.ErrNotFound` + `errors.Is`. They live
   in the package that owns the condition. Custom error types wait until
   something must carry data a sentinel can't.
+- **Server-rendered handlers branch the same way.** A domain sentinel that
+  maps to a non-500 page is handled inline (`errors.Is` → `SetFlash` +
+  re-render); everything else propagates to Echo's error handling.
+
+## Server rendering
+
+- **Views render already-shaped data.** `views/` owns `.templ` sources,
+  generated `*_templ.go`, render DTOs, and `views.LayoutData`. No DB
+  calls, sessions, or domain commands inside `views/` — translation
+  happens in the handler (or a `web/*_pages.go` assembler once it grows).
+- **Render through `web.RenderPage`** (or `RenderPageData` when the
+  component needs the layout data itself). It buffers the whole page
+  before writing, so a mid-stream component failure is a 500, not a
+  partial 200, and it attaches `User` and `Flash` automatically.
+- **Sessions are scs + pgxstore** (the `sessions` table), configured once
+  at boot via `web.ConfigureSessions`. Flash is one-shot session state:
+  `web.SetFlash` / popped by the next render.
+- **Auth is enumeration-safe by construction.** `auth.Authenticate`
+  collapses unknown-email and bad-password into `ErrInvalidCredentials`;
+  bcrypt cost is 12 (signin is rare; ~100ms is tolerable); the session id
+  rotates on signin (`Sessions.RenewToken`) against fixation.
+- **Cross-origin POSTs are rejected** by the `web.SameOriginPost`
+  middleware (Origin, falling back to Sec-Fetch-Site), and POST→GET
+  redirects funnel through `web.SafeRedirect`, which forces local paths.
+- **Errors render as pages for browsers.** The router's error handler
+  content-negotiates: templ error page for `Accept: text/html` (full
+  detail plus a copy button in development only), `apierror` JSON
+  otherwise. Internal detail never reaches a production response.
+- **Static assets** live in `public/`, served at `/public` (override the
+  root with `PUBLIC_DIR`). The shipped `app.css` is a deliberately minimal
+  baseline.
+- **Process configuration goes through `env.Load()`** — read once in
+  main, validated, passed as values. `web.Configure(pool, appEnv)` derives
+  cookie security and the error-page posture from it.
+- **Signin is throttled** per (client IP, email); bcrypt slows offline
+  cracking, the throttle slows online guessing. The default
+  `web.SigninThrottle` is in-memory — scale-out replaces it at boot with a
+  `web.ThrottleStore` backed by shared state.
+- **The design system is the [gesso](https://github.com/mbriggs/gesso)
+  module** — templ components, class helpers, and embedded assets served
+  at `/ui` (`import "github.com/mbriggs/gesso/ui"`, pinned in go.mod).
+  Browse every component and state at `/design` (hidden in production).
+  Pages compose `ui` components rather than inventing markup. For local
+  component work, check out gesso as a sibling and `go work init . ../gesso`
+  (go.work is gitignored); changes land there against gesso's own checks,
+  including its dead-CSS linter, then get tagged and bumped here.
+- `*_templ.go` is generated output like any other: committed, never
+  hand-edited, drift-checked by `bin/check` (`bin/generate` runs
+  `templ generate` first — txgen type-checks packages, so templ output
+  must be current).
 
 ## Testing
 
@@ -144,6 +196,14 @@ by hand.
 - **Within a package:** a test that touches only rows it created (unique
   fixture names via `testdata`) calls `t.Parallel()`. A test that asserts
   on table-wide state stays serial. That's the whole contract.
+- **Factories make test actors.** `auth.Make(ctx, opts...)` inserts a
+  user with unique random-tagged defaults (`auth.MakePassword` is the
+  known cleartext); aggregates grow a `Make` of the same shape. Uniqueness
+  is what keeps parallel tests row-scoped.
+- **Session-bound flows test end to end.** `webtest.Server(ctx)` builds a
+  production-wired Echo app against the package's test database;
+  `webtest.NewClient` carries cookies between requests, so signin, flash,
+  and redirects are asserted through real round trips.
 - Test-first for behavior changes; one behavior per test; tests survive
   refactors because they only speak through public interfaces.
 
@@ -167,17 +227,38 @@ by hand.
 - `any`, not `interface{}`.
 - Match the file you're editing.
 
+## Agent configuration
+
+Instruction files for coding agents are generated, not hand-edited. Edit
+`ai/common/*.md` (always-loaded invariants) and `ai/rules/*.md`
+(path-scoped rules), then `bin/sync-agent-config` writes `CLAUDE.md`,
+`AGENTS.md`, and `.claude/rules/`. Repo-owned skills live in `skills/`,
+symlinked into `.claude/skills` and `.agents/skills` by `bin/link-skills`.
+The Claude post-edit hook re-syncs automatically; the stop hook
+(`bin/agent-stop-check`) runs the drift check plus `bin/check` before an
+agent hands work back.
+
 ## Tooling reference
 
-| Command        | What it does                                                        |
-| -------------- | ------------------------------------------------------------------- |
-| `bin/check`    | Full gate: fmt, build, vet, custom analyzers, golangci, drift, tests |
-| `bin/generate` | Regenerate models (live schema) + delegates (signatures)             |
-| `bin/testdb`   | Recreate + migrate the test template database                        |
-| `bin/migration`| Create a new tern migration                                          |
-| `bin/recreate` | Recreate + migrate the dev database                                  |
-| `bin/setup`    | Install toolchain dependencies                                       |
+| Command                 | What it does                                                                  |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `bin/check`             | Full gate: fmt, shellcheck, build, vet, analyzers, golangci, tidy/codegen drift, tests |
+| `bin/generate`          | Regenerate templ output, models (live schema), delegates (signatures)         |
+| `bin/testdb`            | Recreate + migrate the test template database                                 |
+| `bin/migration`         | Create a new tern migration                                                   |
+| `bin/recreate`          | Recreate + migrate the dev database                                           |
+| `bin/setup`             | Install the toolchain (mise) and generate `.env`                              |
+| `bin/vuln-check`        | govulncheck — separate from `bin/check` because the vuln DB moves on its own  |
+| `bin/coverage`          | Cross-package coverage with a first-party minimum                             |
+| `bin/worktree-setup`    | Per-worktree Postgres clones + port allocation (writes `worktree.env`)        |
+| `bin/worktree-teardown` | Drop the worktree's clones, free its port                                     |
+| `bin/sync-agent-config` | Regenerate agent instruction files from `ai/`                                 |
 
-Custom analyzers live in `analyzers/` and run via `go run ./cmd/lint
-./...`. Stock linters via `.golangci.yml`. Secrets/config come from `.env`
-(gitignored; start from `.env.example`).
+CI (`.github/workflows/check.yml`) runs `bin/check` and `bin/vuln-check`
+against a Postgres service on every push and PR — the same gate as the
+stop hook, so nothing merges that an agent couldn't have handed back.
+
+Tool versions are pinned in `.mise.toml`; mise also loads `.env` and
+`worktree.env`. Custom analyzers live in `analyzers/` and run via
+`go run ./cmd/lint ./...`. Stock linters via `.golangci.yml`.
+Secrets/config come from `.env` (gitignored; start from `.env.example`).
