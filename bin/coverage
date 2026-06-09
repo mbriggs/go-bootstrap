@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Run Go tests with cross-package coverage and enforce the first-party
+# minimum. Generated code and the code generators themselves are excluded
+# from the denominator.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+min="${COVERAGE_MIN:-80.0}"
+profile="$(mktemp)"
+trap 'rm -f "$profile"' EXIT
+
+go test ./... -count=1 -coverpkg=./... -coverprofile="$profile"
+
+awk -v min="$min" '
+NR == 1 { next }
+{
+  split($1, path, ":")
+  file = path[1]
+  if (file ~ /_gen\.go:?$/ || file ~ /_templ\.go:?$/) next
+  if (file ~ /\/cmd\//) next
+
+  key = $1
+  statements[key] = $2
+  if ($3 > 0) covered[key] = 1
+}
+END {
+  for (key in statements) {
+    total += statements[key]
+    if (covered[key]) hit += statements[key]
+  }
+  pct = total == 0 ? 100 : (100 * hit / total)
+  printf "first-party coverage: %.1f%% (%d/%d statements), minimum %.1f%%\n", pct, hit, total, min
+  if (pct + 0.0001 < min) exit 1
+}
+' "$profile"

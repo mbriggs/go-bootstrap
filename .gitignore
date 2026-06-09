@@ -1,2 +1,6 @@
 /tmp
 .env
+worktree.env
+go.work
+go.work.sum
+cssdead

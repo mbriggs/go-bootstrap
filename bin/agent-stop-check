@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Shared Codex/Claude Stop hook.
+# Runs local quality gates before the agent hands work back.
+# Exit 2 with stderr -> the agent is asked to continue and fix the issues.
+set -u
+
+bootstrap_path() {
+  PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+  for dir in "$HOME/.local/share/mise/shims" "$HOME/.local/bin"; do
+    [ -d "$dir" ] && PATH="$dir:$PATH"
+  done
+  export PATH
+}
+
+resolve_project_dir() {
+  local git_root
+  git_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  if [ -n "$git_root" ] && [ -d "$git_root" ]; then
+    printf '%s\n' "$git_root"
+    return
+  fi
+  local script_dir
+  script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+  CDPATH='' cd -- "$script_dir/.." && pwd
+}
+
+# Bail if this stop was itself triggered by a stop-hook continuation, so a
+# check that the agent cannot satisfy does not loop forever.
+INPUT=$(cat)
+if printf '%s' "$INPUT" | grep -Eq '"stop_hook_active"[[:space:]]*:[[:space:]]*true'; then
+  printf '{"continue":true}\n'
+  exit 0
+fi
+
+bootstrap_path
+
+PROJECT_DIR=$(resolve_project_dir)
+cd "$PROJECT_DIR" || {
+  printf '{"continue":true}\n'
+  exit 0
+}
+
+FAILED=0
+REPORT=""
+
+run_check() {
+  local label="$1"; shift
+  local out
+  if ! out=$("$@" 2>&1); then
+    FAILED=1
+    REPORT="${REPORT}${label}:
+${out}
+
+"
+  fi
+}
+
+run_check "Agent config drift" bin/sync-agent-config --check
+run_check "bin/check" bin/check
+
+if [ "$FAILED" -ne 0 ]; then
+  printf '%s' "$REPORT" >&2
+  echo "Fix the issues above before stopping." >&2
+  exit 2
+fi
+
+printf '{"continue":true}\n'

@@ -1,0 +1,18 @@
+# Worktrunk project config — see https://worktrunk.dev/config/
+#
+# Each worktree gets:
+#   - its own Postgres clones of the dev database and the test template,
+#     created from the main checkout's DBs via CREATE DATABASE ... TEMPLATE
+#   - a port allocated from a central pool (bin/port-allocate), step 20 so
+#     each worktree has room for sidecar services
+#   - a worktree.env override file loaded by mise (.mise.toml `_.file`)
+#
+# All the per-worktree logic — including copying .env from the main
+# checkout — lives in bin/worktree-setup, so the scripts work outside
+# worktrunk too (e.g. manual `git worktree add`).
+
+pre-start = [
+  { setup = "bin/worktree-setup" },
+]
+
+pre-remove = "bin/worktree-teardown"

@@ -1,0 +1,19 @@
+---
+title: The Transaction Pattern
+claudePaths:
+  - "**/*.go"
+---
+
+Persistence functions are hand-written only in their
+`FooTx(ctx, tx db.Queryable, ...)` form; `bin/generate` (cmd/txgen) emits the
+pool-backed bare delegate. There is no ambient transaction — nothing rides in
+`context.Context` — because `pgx.Tx` is not concurrency-safe and implicit
+transactions hide that hazard.
+
+`db.Conn` is confined to generated files, the db package's own bootstrap and
+tx boundary, the webtest harness, and `package main` — the `connconfine`
+analyzer enforces this. A declared-but-unused `tx` parameter is an error
+(`txparam`): it means reads or writes are escaping the transaction.
+
+See the "transaction pattern" section of STANDARDS.md for rationale and
+examples.

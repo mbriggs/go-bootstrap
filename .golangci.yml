@@ -1,15 +1,169 @@
 version: "2"
 
+run:
+  timeout: 5m
+  go: "1.26"
+
 linters:
-  default: standard
+  default: none
   enable:
+    # Catches passing []any as one variadic argument when args... was intended.
+    - asasalint
+    # Keeps identifiers ASCII-only for readability and searchability.
+    - asciicheck
+    # Rejects bidirectional Unicode controls that can make source read differently than it compiles.
+    - bidichk
+    # Ensures HTTP response bodies are closed so clients do not leak connections.
+    - bodyclose
+    # Keeps net/http header keys in canonical MIME form.
+    - canonicalheader
+    # Rejects storing context.Context inside structs.
+    - containedctx
+    # Removes obsolete or suspicious loop-variable copies under modern Go range semantics.
+    - copyloopvar
+    # Catches invalid duration arithmetic, especially duration-by-duration multiplication.
+    - durationcheck
+    # Finds accidental repeated words in comments and strings.
+    - dupword
+    # Pushes package-level sentinel errors instead of ad hoc dynamic errors.
+    - err113
+    # Requires returned errors to be handled or explicitly ignored.
+    - errcheck
+    # Checks JSON encode/decode calls for unsupported types and meaningful errors.
+    - errchkjson
+    # Keeps sentinel errors and typed errors on Go naming conventions.
+    - errname
+    # Enforces Go 1.13+ error wrapping, matching, and type assertion patterns.
+    - errorlint
+    # Replaces graduated golang.org/x/exp APIs with stdlib equivalents.
+    - exptostd
+    # Requires enum-like switch statements to handle all named constants.
+    - exhaustive
+    # Detects nested context creation patterns that can leak or over-retain context state.
+    - fatcontext
+    # Rejects unchecked type assertions that would panic on unexpected values.
+    - forcetypeassert
+    # Runs a curated set of Go critique checks for suspicious code and simplifications.
+    - gocritic
+    # Runs Go vet analyzers through golangci-lint as the single vet entrypoint.
+    - govet
+    # Checks go.mod directives for local replacements or excludes that should not ship.
+    - gomoddirectives
+    # Flags common security mistakes that deserve explicit review.
+    - gosec
+    # Finds assignments whose value is never used.
+    - ineffassign
+    # Suggests Go integer range loops where they make count-based iteration clearer.
+    - intrange
+    # Keeps iota const blocks from mixing implicit and unrelated explicit values.
+    - iotamixing
+    # Validates //go: compiler directive comments.
+    - gocheckcompilerdirectives
+    # Requires printf-style helper names to end in f.
+    - goprintffuncname
+    # Catches slices made with non-zero length and then appended to.
+    - makezero
+    # Finds common misspellings in comments and strings.
     - misspell
+    # Suggests clearer mirrored helpers for bytes/strings operations.
+    - mirror
+    # Suggests newer Go syntax and stdlib APIs where they reduce boilerplate.
+    - modernize
+    # Rejects naked returns where implicit result values obscure control flow.
+    - nakedret
+    # Finds branches that check an error and then return a nil error.
+    - nilerr
+    # Uses nilness analysis to catch indirect variants of swallowed errors.
+    - nilnesserr
+    # Requires net.JoinHostPort instead of fmt.Sprintf for host:port strings.
+    - nosprintfhostport
+    # Requires outbound HTTP requests to carry a context.
+    - noctx
+    # Keeps lint suppressions specific, explained, and well-formed.
+    - nolintlint
+    # Finds fmt.Sprintf calls that can be cheaper or clearer with simpler formatting.
+    - perfsprint
+    # Suggests preallocating slices when their eventual size is statically clear.
+    - prealloc
+    # Prevents shadowing Go predeclared identifiers like len, error, or string.
+    - predeclared
+    # Keeps method receiver names and pointer/value usage consistent per type.
+    - recvcheck
+    # Runs configurable style and correctness rules as a modern golint successor.
+    - revive
+    # Requires rows.Err checks after manual SQL row iteration.
+    - rowserrcheck
+    # Requires SQL and pgx rows/statements to be closed by their owner.
+    - sqlclosecheck
+    # Runs high-signal static analysis beyond go vet.
+    - staticcheck
+    # Ensures Go Example functions are runnable docs when present.
+    - testableexamples
+    # Requires test helper functions to call t.Helper for better failure lines.
+    - thelper
+    # Removes redundant type conversions.
     - unconvert
+    # Finds parameters that are always unused after refactors.
     - unparam
+    # Rejects SELECT * so SQL row shape stays explicit.
+    - unqueryvet
+    # Prefers modern testing helpers like t.Setenv, t.TempDir, and t.Cleanup.
+    - usetesting
+    # Prefers standard-library constants over duplicated literal values.
+    - usestdlibvars
+    # Finds unused private declarations before stale scaffolding accumulates.
+    - unused
+    # Finds assignments overwritten before their value is read.
+    - wastedassign
+    # Removes unnecessary blank lines at block boundaries.
+    - whitespace
+    # Catches returned external errors that lose package-level context.
+    - wrapcheck
   settings:
     errcheck:
       # Deferred closes of read-path handles; nothing actionable on failure.
       exclude-functions:
         - (*github.com/jackc/pgx/v5.Conn).Close
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      # Keep revive for correctness/style checks without letting it impose
+      # godoc comments, ID initialism spelling, or test-helper parameter style.
+      rules:
+        - name: context-as-argument
+          disabled: true
+        - name: exported
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+        - name: var-declaration
+          disabled: true
+        - name: var-naming
+          disabled: true
+    wrapcheck:
+      # Packages intentionally pass sentinel and internal errors through;
+      # wrapping is reserved for external package boundaries.
+      ignore-package-globs:
+        - github.com/mbriggs/go-bootstrap/*
   exclusions:
-    generated: lax
+    generated: strict
+    rules:
+      # The code generators and lint runner are short-lived CLIs whose errors
+      # terminate the run; dynamic error messages there are reports for the
+      # operator, not values callers branch on.
+      - linters:
+          - err113
+        path: ^cmd/
+      # The generators write into repo-local package directories by design;
+      # their paths come from go/packages metadata, not user input.
+      - linters:
+          - gosec
+        path: ^cmd/
+        text: "G703"
+      # SQL test fixtures sometimes contain repeated boolean literals; dupword
+      # reads those value lists as prose even though they are intentional.
+      - linters:
+          - dupword
+        path: _test\.go
+        text: "Duplicate words \\(false,\\) found"

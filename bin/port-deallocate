@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Free the port allocation for the current worktree. Idempotent.
+#
+# Usage: bin/port-deallocate
+
+project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+ALLOC_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$project"
+ALLOC_FILE="$ALLOC_DIR/port-allocations.tsv"
+LOCK_DIR="$ALLOC_DIR/port-alloc.lock"
+STALE_LOCK_SECS=30
+
+[[ -f "$ALLOC_FILE" ]] || exit 0
+
+acquire_lock() {
+  for attempt in $(seq 1 50); do
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      return
+    fi
+    if [[ $attempt -eq 50 ]]; then
+      local age
+      age=$(( $(date +%s) - $(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null || echo 0) ))
+      if [[ $age -gt $STALE_LOCK_SECS ]]; then
+        echo "removing stale lock (${age}s old)" >&2
+        rmdir "$LOCK_DIR" 2>/dev/null || true
+        mkdir "$LOCK_DIR" && return
+      fi
+      echo "could not acquire port-alloc lock after 50 attempts" >&2
+      exit 1
+    fi
+    sleep 0.1
+  done
+}
+
+release_lock() { rmdir "$LOCK_DIR" 2>/dev/null || true; }
+trap release_lock EXIT
+
+workdir="$PWD"
+
+acquire_lock
+
+tmp="$(mktemp)"
+awk -F'\t' -v wd="$workdir" '$2 != wd' "$ALLOC_FILE" > "$tmp"
+mv "$tmp" "$ALLOC_FILE"
+
+echo "port deallocated for $workdir"

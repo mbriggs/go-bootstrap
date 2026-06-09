@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Drop the worktree's cloned DBs and free its port allocation. Idempotent.
+# Invoked by `.config/wt.toml`'s pre-remove hook.
+
+WORKTREE_DIR="$(git rev-parse --show-toplevel)"
+ROOT_DIR="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+cd "$WORKTREE_DIR"
+
+if [[ "$WORKTREE_DIR" == "$ROOT_DIR" ]]; then
+  echo "bin/worktree-teardown is for worktrees, not the main checkout." >&2
+  exit 1
+fi
+
+project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+ALLOC_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/$project/port-allocations.tsv"
+
+# Recover the allocated port from the registry (single source of truth).
+port=""
+if [[ -f "$ALLOC_FILE" ]]; then
+  port="$(awk -F'\t' -v wd="$WORKTREE_DIR" '$2 == wd { print $1; exit }' "$ALLOC_FILE")"
+fi
+
+if [[ -z "$port" ]]; then
+  echo "==> no port allocation found for $WORKTREE_DIR, nothing to drop"
+  exec "$ROOT_DIR/bin/port-deallocate"
+fi
+
+# Use the main checkout's .env to recover the PG connection variables — the
+# worktree's may have already been removed or rewritten.
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  . "$ROOT_DIR/.env"
+  set +a
+fi
+
+SRC_DEV_DB="${PGDATABASE:-${project}_dev}"
+SRC_TEMPLATE_DB="${project}_template"
+
+drop_db() {
+  local name="$1"
+  # Safety net — never drop the source DBs the clones came from.
+  case "$name" in
+    "$SRC_DEV_DB"|"$SRC_TEMPLATE_DB")
+      echo "==> refusing to drop source DB '$name'"
+      return
+      ;;
+  esac
+  if [[ -z "$(psql -XAtqc "SELECT 1 FROM pg_database WHERE datname = '${name//\'/\'\'}'" postgres 2>/dev/null)" ]]; then
+    echo "==> $name does not exist, skipping"
+    return
+  fi
+  echo "==> dropping $name"
+  psql -XAtqc "DROP DATABASE \"$name\" WITH (FORCE)" postgres > /dev/null
+}
+
+drop_db "${SRC_DEV_DB}_${port}"
+drop_db "${SRC_TEMPLATE_DB}_${port}"
+
+"$ROOT_DIR/bin/port-deallocate"

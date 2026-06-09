@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Allocate a dev-server port for the current worktree.
+#
+# Registry: ${XDG_STATE_HOME:-~/.local/state}/<project>/port-allocations.tsv,
+# keyed by $PWD. Idempotent — re-running in the same worktree returns the
+# existing allocation.
+#
+# Pool: starts at POOL_START, step POOL_STEP — leaves room for sidecar
+# services per worktree (e.g. an HMR socket, a debugger port).
+#
+# Usage: bin/port-allocate [branch-name]
+#   Prints the allocated port to stdout.
+
+POOL_START="${POOL_START:-8180}"
+POOL_STEP="${POOL_STEP:-20}"
+
+project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+ALLOC_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$project"
+ALLOC_FILE="$ALLOC_DIR/port-allocations.tsv"
+LOCK_DIR="$ALLOC_DIR/port-alloc.lock"
+STALE_LOCK_SECS=30
+
+mkdir -p "$ALLOC_DIR"
+
+acquire_lock() {
+  for attempt in $(seq 1 50); do
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      return
+    fi
+    if [[ $attempt -eq 50 ]]; then
+      local age
+      age=$(( $(date +%s) - $(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null || echo 0) ))
+      if [[ $age -gt $STALE_LOCK_SECS ]]; then
+        echo "removing stale lock (${age}s old)" >&2
+        rmdir "$LOCK_DIR" 2>/dev/null || true
+        mkdir "$LOCK_DIR" && return
+      fi
+      echo "could not acquire port-alloc lock after 50 attempts" >&2
+      exit 1
+    fi
+    sleep 0.1
+  done
+}
+
+release_lock() { rmdir "$LOCK_DIR" 2>/dev/null || true; }
+trap release_lock EXIT
+
+branch="${1:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo worktree)}"
+workdir="$PWD"
+
+acquire_lock
+
+touch "$ALLOC_FILE"
+
+# Idempotent return for $PWD.
+existing=$(awk -F'\t' -v wd="$workdir" '$2 == wd { print $1; exit }' "$ALLOC_FILE")
+if [[ -n "$existing" ]]; then
+  echo "$existing"
+  exit 0
+fi
+
+# Find first free port at POOL_START + n*POOL_STEP.
+used_ports=$(cut -f1 "$ALLOC_FILE" | sort -n)
+port=$POOL_START
+while echo "$used_ports" | grep -qx "$port"; do
+  port=$(( port + POOL_STEP ))
+done
+
+printf '%s\t%s\t%s\n' "$port" "$workdir" "$branch" >> "$ALLOC_FILE"
+echo "$port"

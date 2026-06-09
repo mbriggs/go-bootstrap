@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+shopt -s nullglob
+
+# Keeps repo-owned skills linked into per-project Claude and Codex skill dirs.
+#
+# Both tools support a project-local skills directory:
+#   - Claude: <repo>/.claude/skills
+#   - Codex:  <repo>/.agents/skills  (scanned from cwd up to repo root)
+#
+# Both are committed relative symlinks to <repo>/skills, so each worktree
+# resolves to its own skills/ via relative path — no user-global state.
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE_DIR="$ROOT/skills"
+CLAUDE_LINK="$ROOT/.claude/skills"
+CODEX_LINK="$ROOT/.agents/skills"
+LINK_TARGET="../skills"
+CHECK=0
+FAILED=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --check)
+      CHECK=1
+      shift
+      ;;
+    --adopt)
+      # Accepted for compatibility with bin/sync-agent-config; no user-global
+      # state exists to adopt. No-op.
+      shift
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ ! -d "$SOURCE_DIR" ]]; then
+  echo "Skills directory not found: $SOURCE_DIR" >&2
+  exit 1
+fi
+
+fail() {
+  FAILED=1
+  echo "$1" >&2
+}
+
+ensure_link() {
+  local link="$1"
+  local parent
+  parent="$(dirname "$link")"
+
+  if [[ -L "$link" ]]; then
+    local existing
+    existing="$(readlink "$link")"
+    if [[ "$existing" == "$LINK_TARGET" ]]; then
+      echo "ok     $link -> $existing"
+      return
+    fi
+    if [[ "$CHECK" -eq 1 ]]; then
+      fail "drift  $link -> $existing; expected $LINK_TARGET"
+      return
+    fi
+    rm -f "$link"
+  elif [[ -e "$link" ]]; then
+    if [[ "$CHECK" -eq 1 ]]; then
+      fail "drift  $link exists and is not a symlink"
+      return
+    fi
+    rm -rf "$link"
+  elif [[ "$CHECK" -eq 1 ]]; then
+    fail "missing $link -> $LINK_TARGET"
+    return
+  fi
+
+  mkdir -p "$parent"
+  ln -s "$LINK_TARGET" "$link"
+  echo "link   $link -> $LINK_TARGET"
+}
+
+ensure_link "$CLAUDE_LINK"
+ensure_link "$CODEX_LINK"
+
+if [[ "$FAILED" -ne 0 ]]; then
+  exit 1
+fi

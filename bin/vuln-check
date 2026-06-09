@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#
+# Dynamic security checks. Kept separate from bin/check because vulnerability
+# database updates can change results without a code change.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+
+: "${GOCACHE:=${TMPDIR:-/tmp}/${project}-govulncheck-gocache}"
+export GOCACHE
+
+exec govulncheck ./...

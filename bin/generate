@@ -8,4 +8,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# templ first: txgen type-checks every package, so *_templ.go must be
+# current before go generate runs modelgen + txgen.
+templ generate
+
 go generate .
