@@ -3,7 +3,7 @@ _.path = ["./bin"]
 _.file = [".env", "worktree.env"]
 
 [tools]
-go = "1.26.3"
+go = "1.26.4"
 air = "1.65.3"
 gofumpt = "0.10.0"
 golangci-lint = "2.12.2"
