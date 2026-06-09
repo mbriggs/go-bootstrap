@@ -1,0 +1,38 @@
+package views
+
+import "github.com/mbriggs/gesso/ui"
+
+templ Layout(data LayoutData, body templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ data.Title }</title>
+			<link rel="stylesheet" href={ ui.AssetPath("ui.css") }/>
+			<link rel="stylesheet" href="/public/app.css"/>
+			<script>document.documentElement.classList.add("js");</script>
+			@ui.ImportMap()
+			<script type="module" src={ ui.AssetPath("ui.js") }></script>
+			if data.HeadExtras != nil {
+				@data.HeadExtras
+			}
+		</head>
+		<body>
+			if data.User != nil {
+				<header class="app-header">
+					<span>{ data.User.Email }</span>
+					<form method="post" action="/signout">
+						@ui.Button(ui.ButtonProps{Type: "submit", Variant: "ghost", Size: "sm", Text: "Sign out"})
+					</form>
+				</header>
+			}
+			if data.Flash != nil {
+				@ui.Alert(ui.AlertProps{Tone: flashTone(data.Flash.Kind), Role: "status", Text: data.Flash.Message, Class: "app-flash"})
+			}
+			<main>
+				@body
+			</main>
+		</body>
+	</html>
+}

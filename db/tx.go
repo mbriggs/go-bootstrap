@@ -16,7 +16,6 @@ func InTx[T any](ctx context.Context, fn func(tx pgx.Tx) (T, error)) (T, error) 
 	}
 
 	result, err = fn(tx)
-
 	if err != nil {
 		if rbErr := tx.Rollback(ctx); rbErr != nil {
 			logger.Error("could not roll back transaction", "error", rbErr)
@@ -40,7 +39,6 @@ func ExecInTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
 	}
 
 	err = fn(tx)
-
 	if err != nil {
 		if rbErr := tx.Rollback(ctx); rbErr != nil {
 			logger.Error("could not roll back transaction", "error", rbErr)

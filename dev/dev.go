@@ -7,8 +7,10 @@ import (
 	"github.com/mbriggs/go-bootstrap/logging"
 )
 
-var logger = logging.Logger("dev")
-var devMode = false
+var (
+	logger  = logging.Logger("dev")
+	devMode = false
+)
 
 func DevMode() {
 	devMode = true
@@ -21,7 +23,6 @@ func PP(val any) any {
 	}
 
 	prettyJSON, err := json.MarshalIndent(val, "", "    ")
-
 	if err != nil {
 		logger.Error("Failed to generate json", "error", err)
 		panic(fmt.Errorf("from dev.PP: %w", err))

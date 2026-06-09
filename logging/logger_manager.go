@@ -32,7 +32,6 @@ func (lm *Manager) Configure(settings string, defaultLevel string) error {
 	defer lm.Unlock()
 
 	config, err := NewConfig(settings, defaultLevel)
-
 	if err != nil {
 		return err
 	}
@@ -41,7 +40,10 @@ func (lm *Manager) Configure(settings string, defaultLevel string) error {
 
 	// Iterate over any existing loggers, and set the output and level.
 	for name := range lm.loggers {
-		handler := lm.loggers[name].Handler().(*log.Logger)
+		handler, ok := lm.loggers[name].Handler().(*log.Logger)
+		if !ok {
+			continue
+		}
 		handler.SetOutput(lm.device(name))
 		handler.SetLevel(lm.getLevel(name))
 	}
@@ -59,7 +61,7 @@ func (lm *Manager) Logger(name string) *slog.Logger {
 		return logger
 	}
 
-	var device = lm.device(name)
+	device := lm.device(name)
 
 	// Even though we are using slog, we are using charmbracelet/log for the handler.
 	// The handler is the part of the logger that actually writes the log messages.

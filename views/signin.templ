@@ -1,0 +1,28 @@
+package views
+
+import "github.com/mbriggs/gesso/ui"
+
+templ SigninPage(email string) {
+	<h1>Sign in</h1>
+	<form method="post" action="/signin" class="stack gap-md">
+		@ui.Field(ui.FieldProps{
+			ID:    "email",
+			Label: "Email",
+			Control: ui.Input(ui.InputProps{
+				ID: "email", Name: "email", Type: "email",
+				Value: email, Required: true, Autofocus: true,
+			}),
+		})
+		@ui.Field(ui.FieldProps{
+			ID:    "password",
+			Label: "Password",
+			Control: ui.Input(ui.InputProps{
+				ID: "password", Name: "password", Type: "password",
+				Required: true,
+			}),
+		})
+		<div>
+			@ui.Button(ui.ButtonProps{Type: "submit", Variant: "primary", Text: "Sign in"})
+		</div>
+	</form>
+}

@@ -19,7 +19,10 @@ type AppRequest struct {
 }
 
 func Request[T any](t *testing.T, appReq AppRequest) T {
-	logger.Debug("Request",
+	t.Helper()
+
+	logger.Debug(
+		"Request",
 		"method", appReq.Method,
 		"path", appReq.Path(),
 	)
@@ -27,14 +30,14 @@ func Request[T any](t *testing.T, appReq AppRequest) T {
 	// Build Request
 	var req *http.Request
 	if appReq.Body == nil {
-		req = httptest.NewRequest(appReq.Method, appReq.Path(), nil)
+		req = httptest.NewRequestWithContext(t.Context(), appReq.Method, appReq.Path(), nil)
 	} else {
 		body, err := json.Marshal(appReq.Body)
 		if err != nil {
 			t.Fatalf("Failed to marshal request body: %v", err)
 		}
 
-		req = httptest.NewRequest(appReq.Method, appReq.Path(), bytes.NewBuffer(body))
+		req = httptest.NewRequestWithContext(t.Context(), appReq.Method, appReq.Path(), bytes.NewBuffer(body))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	}
 
@@ -50,7 +53,6 @@ func Request[T any](t *testing.T, appReq AppRequest) T {
 	logger.Info("Requesting", "method", appReq.Method, "path", appReq.Path())
 
 	err := appReq.Handler(c)
-
 	if err != nil {
 		t.Errorf("handler for %s failed: %v", appReq.Path(), err)
 	}

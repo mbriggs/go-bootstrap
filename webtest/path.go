@@ -27,7 +27,8 @@ func (ps *PathState) PathParam(key, value string) *PathState {
 }
 
 func (ps *PathState) RoutedState() ([]string, []string) {
-	var names, values []string
+	names := make([]string, 0, len(ps.Params))
+	values := make([]string, 0, len(ps.Params))
 
 	for k, v := range ps.Params {
 		names = append(names, k)

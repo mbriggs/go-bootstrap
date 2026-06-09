@@ -37,7 +37,7 @@ func main() {
 
 	pkgs, err := packages.Load(cfg, os.Args[1:]...)
 	if err != nil {
-		fatal("loading packages: %v", err)
+		fatalf("loading packages: %v", err)
 	}
 
 	if packages.PrintErrors(pkgs) > 0 {
@@ -50,12 +50,12 @@ func main() {
 		}
 
 		if err := generate(pkg); err != nil {
-			fatal("generating for %s: %v", pkg.PkgPath, err)
+			fatalf("generating for %s: %v", pkg.PkgPath, err)
 		}
 	}
 }
 
-func fatal(format string, args ...any) {
+func fatalf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "txgen: "+format+"\n", args...)
 	os.Exit(1)
 }
@@ -121,7 +121,11 @@ func generate(pkg *packages.Package) error {
 		return fmt.Errorf("resolving imports (%s): %w\n%s", path, err, buf.String())
 	}
 
-	return os.WriteFile(path, out, 0o644)
+	if err := os.WriteFile(path, out, 0o600); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+
+	return nil
 }
 
 func dirOf(pkg *packages.Package) string {
@@ -131,12 +135,11 @@ func dirOf(pkg *packages.Package) string {
 func removeStale(dir string) error {
 	path := filepath.Join(dir, genFileName)
 
-	err := os.Remove(path)
-	if os.IsNotExist(err) {
-		return nil
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("removing stale %s: %w", path, err)
 	}
 
-	return err
+	return nil
 }
 
 // queryableField returns the index of the db.Queryable parameter field,
@@ -312,7 +315,7 @@ func printExpr(fset *token.FileSet, expr ast.Expr) (string, error) {
 	var buf bytes.Buffer
 
 	if err := printer.Fprint(&buf, fset, expr); err != nil {
-		return "", err
+		return "", fmt.Errorf("printing expression: %w", err)
 	}
 
 	return buf.String(), nil

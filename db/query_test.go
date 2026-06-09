@@ -6,6 +6,7 @@ package db_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -44,11 +45,11 @@ func TestFindTxSeesUncommittedWrites(t *testing.T) {
 	_, err := db.InTx(ctx, func(tx pgx.Tx) (row, error) {
 		_, err := tx.Exec(ctx, "CREATE TEMP TABLE smoke (id bigint)")
 		if err != nil {
-			return row{}, err
+			return row{}, fmt.Errorf("creating temp table: %w", err)
 		}
 
 		if _, err := tx.Exec(ctx, "INSERT INTO smoke (id) VALUES (42)"); err != nil {
-			return row{}, err
+			return row{}, fmt.Errorf("inserting row: %w", err)
 		}
 
 		got, err := db.FindTx[row](ctx, tx, "SELECT id FROM smoke")

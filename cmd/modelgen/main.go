@@ -44,12 +44,12 @@ func main() {
 
 	raw, err := os.ReadFile("modelgen.yaml")
 	if err != nil {
-		fatal("reading config: %v", err)
+		fatalf("reading config: %v", err)
 	}
 
 	var config Config
 	if err := yaml.Unmarshal(raw, &config); err != nil {
-		fatal("parsing config: %v", err)
+		fatalf("parsing config: %v", err)
 	}
 
 	if len(config.Tables) == 0 {
@@ -59,18 +59,18 @@ func main() {
 
 	conn, err := pgx.Connect(ctx, "")
 	if err != nil {
-		fatal("connecting (PG env vars): %v", err)
+		fatalf("connecting (PG env vars): %v", err)
 	}
 	defer conn.Close(ctx)
 
 	for _, table := range config.Tables {
 		if err := generate(ctx, conn, table); err != nil {
-			fatal("generating %s: %v", table.Table, err)
+			fatalf("generating %s: %v", table.Table, err)
 		}
 	}
 }
 
-func fatal(format string, args ...any) {
+func fatalf(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "modelgen: "+format+"\n", args...)
 	os.Exit(1)
 }
@@ -107,7 +107,6 @@ func generate(ctx context.Context, conn *pgx.Conn, table TableConfig) error {
 		columns = append(columns, col)
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("scanning columns: %w", err)
 	}
@@ -128,7 +127,11 @@ func generate(ctx context.Context, conn *pgx.Conn, table TableConfig) error {
 		return fmt.Errorf("resolving imports: %w\n%s", err, src)
 	}
 
-	return os.WriteFile(path, out, 0o644)
+	if err := os.WriteFile(path, out, 0o600); err != nil {
+		return fmt.Errorf("writing %s: %w", path, err)
+	}
+
+	return nil
 }
 
 func render(table TableConfig, columns []column) ([]byte, error) {
@@ -195,6 +198,9 @@ func goType(col column) (string, error) {
 		}
 	}
 
+	// uuid and numeric map to string deliberately: no forced uuid
+	// dependency, and no float corruption for arbitrary-precision values.
+	// Projects that adopt a uuid or decimal package change two lines here.
 	base, ok := map[string]string{
 		"int2":        "int",
 		"int4":        "int",
@@ -211,6 +217,11 @@ func goType(col column) (string, error) {
 		"_text":       "[]string",
 		"_int4":       "[]int",
 		"_int8":       "[]int64",
+		"uuid":        "string",
+		"citext":      "string",
+		"date":        "time.Time",
+		"bytea":       "[]byte",
+		"numeric":     "string",
 	}[col.UDT]
 
 	if !ok {

@@ -1,9 +1,10 @@
 // Package connconfine reports references to the db package's global
 // connection pool outside its allowed homes: generated delegate files, the
-// db package's own bootstrap (db.go) and transaction boundary (tx.go), and
-// package main. Hand-written code mid-call-tree must take a db.Queryable
-// instead — reaching for the pool there is how reads silently escape
-// transactions.
+// db package's own bootstrap (db.go) and transaction boundary (tx.go),
+// package main, and the webtest harness (the composition root for tests,
+// playing main's role). Hand-written code mid-call-tree must take a
+// db.Queryable instead — reaching for the pool there is how reads silently
+// escape transactions.
 package connconfine
 
 import (
@@ -26,7 +27,7 @@ var allowedDBFiles = map[string]bool{
 }
 
 func run(pass *analysis.Pass) (any, error) {
-	if pass.Pkg.Name() == "main" {
+	if pass.Pkg.Name() == "main" || pass.Pkg.Name() == "webtest" {
 		return nil, nil
 	}
 

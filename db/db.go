@@ -25,12 +25,11 @@ var ErrNotFound = errors.New("not found")
 func Configure(ctx context.Context, dsn string) error {
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating connection pool: %w", err)
 	}
 
 	// Ping the database to ensure the connection is working.
 	err = pool.Ping(ctx)
-
 	if err != nil {
 		return fmt.Errorf("error pinging database: %w", err)
 	}

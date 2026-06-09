@@ -31,7 +31,17 @@ var Echo *echo.Echo = echo.New()
 
 var logger = logging.Logger("webtest")
 
-var templateDB = projectName() + "_template"
+var templateDB = templateDBName()
+
+// templateDBName honors the TEMPLATE_DB override written by
+// bin/worktree-setup, so each worktree clones from its own template.
+func templateDBName() string {
+	if name := os.Getenv("TEMPLATE_DB"); name != "" {
+		return name
+	}
+
+	return projectName() + "_template"
+}
 
 // Main wraps testing.M for packages that touch the database. Call it from
 // TestMain:

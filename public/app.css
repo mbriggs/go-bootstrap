@@ -1,0 +1,39 @@
+/* Skeleton-page chrome layered on the ui design system (/ui/ui.css) —
+   page width, header, error detail. Replace freely as the app grows. */
+
+@layer app {
+  body {
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    max-width: 40rem;
+  }
+
+  .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    font-size: 0.875rem;
+    color: var(--color-text-muted, #6b7280);
+  }
+
+  .app-flash {
+    margin-bottom: 1rem;
+  }
+
+  main h1 {
+    margin-bottom: 1rem;
+  }
+
+  .error-detail {
+    margin-bottom: 1rem;
+    padding: 0.875rem;
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    white-space: pre-wrap;
+    border-radius: 0.375rem;
+    background: var(--color-danger-surface, #fef2f2);
+    color: var(--color-danger-text, #b91c1c);
+  }
+}

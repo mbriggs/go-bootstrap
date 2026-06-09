@@ -8,6 +8,11 @@ import (
 	"github.com/mbriggs/pgsql"
 )
 
+// Delete delegates to DeleteTx using the connection pool.
+func Delete(ctx context.Context, del *pgsql.DeleteStatement) (int64, error) {
+	return DeleteTx(ctx, Conn, del)
+}
+
 // FindAll delegates to FindAllTx using the connection pool.
 func FindAll[T any](ctx context.Context, sql string, args ...any) ([]T, error) {
 	return FindAllTx[T](ctx, Conn, sql, args...)
@@ -16,6 +21,11 @@ func FindAll[T any](ctx context.Context, sql string, args ...any) ([]T, error) {
 // Find delegates to FindTx using the connection pool.
 func Find[T any](ctx context.Context, sql string, args ...any) (T, error) {
 	return FindTx[T](ctx, Conn, sql, args...)
+}
+
+// Insert delegates to InsertTx using the connection pool.
+func Insert[T any](ctx context.Context, insert *pgsql.InsertStatement) (T, error) {
+	return InsertTx[T](ctx, Conn, insert)
 }
 
 // Update delegates to UpdateTx using the connection pool.

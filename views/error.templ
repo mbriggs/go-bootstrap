@@ -1,0 +1,22 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/mbriggs/gesso/ui"
+)
+
+templ ErrorPage(data ErrorPageData) {
+	<h1>{ strconv.Itoa(data.Status) } { data.StatusText }</h1>
+	<p>Something went wrong. If it keeps happening, let us know.</p>
+	if data.Detail != "" {
+		<pre id="error-detail" class="error-detail">{ data.Detail }</pre>
+		@ui.Button(ui.ButtonProps{
+			Type:    "button",
+			Variant: "secondary",
+			Size:    "sm",
+			Text:    "Copy error",
+			Attrs:   ui.Attrs("onclick", "navigator.clipboard.writeText(document.getElementById('error-detail').textContent)"),
+		})
+	}
+}

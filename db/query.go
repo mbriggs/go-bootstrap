@@ -28,7 +28,6 @@ func FindAllTx[T any](ctx context.Context, tx Queryable, sql string, args ...any
 	defer rows.Close()
 
 	result, err := pgx.CollectRows(rows, pgx.RowToStructByName[T])
-
 	if err != nil {
 		return nil, fmt.Errorf("db search error collecting: %w", err)
 	}
@@ -39,7 +38,6 @@ func FindAllTx[T any](ctx context.Context, tx Queryable, sql string, args ...any
 func FindTx[T any](ctx context.Context, tx Queryable, sql string, args ...any) (T, error) {
 	var result T
 	results, err := FindAllTx[T](ctx, tx, sql, args...)
-
 	if err != nil {
 		return result, fmt.Errorf("db find error: %w", err)
 	}

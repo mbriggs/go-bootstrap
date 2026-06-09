@@ -4,6 +4,7 @@
 package apierror
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -19,13 +20,18 @@ type Response struct {
 
 // JSON renders an Algolia-shaped error with the given status and message.
 func JSON(c echo.Context, status int, message string) error {
-	return c.JSON(status, Response{Message: message, Status: status})
+	if err := c.JSON(status, Response{Message: message, Status: status}); err != nil {
+		return fmt.Errorf("rendering api error: %w", err)
+	}
+
+	return nil
 }
 
 // Internal logs err with request context and renders a generic 500,
 // keeping the internal detail out of the response body.
 func Internal(c echo.Context, err error) error {
-	logger.Error("internal error",
+	logger.Error(
+		"internal error",
 		"method", c.Request().Method,
 		"uri", c.Request().RequestURI,
 		"error", err,

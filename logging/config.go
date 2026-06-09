@@ -1,11 +1,14 @@
 package logging
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/log"
 )
+
+var ErrUnknownLevel = errors.New("unknown log level")
 
 // LoggingConfig holds the configuration for the loggers.
 type LoggingConfig struct {
@@ -38,7 +41,7 @@ func NewConfig(config string, defaultLevel string) (LoggingConfig, error) {
 
 	// Split the config string by comma.
 	// "MyTag:debug,MyOtherTag,-MyExcludedTag" => ["MyTag:debug", "MyOtherTag", "-MyExcludedTag"]
-	for _, tag := range strings.Split(config, ",") {
+	for tag := range strings.SplitSeq(config, ",") {
 		tag = strings.TrimSpace(tag)
 
 		// Split the tag by colon.
@@ -118,6 +121,6 @@ func parseLogLevel(level string) (log.Level, error) {
 	case "ERROR":
 		return log.ErrorLevel, nil
 	default:
-		return log.InfoLevel, fmt.Errorf("unknown log level: %s", level)
+		return log.InfoLevel, fmt.Errorf("%w: %s", ErrUnknownLevel, level)
 	}
 }
