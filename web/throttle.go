@@ -32,8 +32,9 @@ type ThrottleStore interface {
 var SigninThrottle ThrottleStore = &memoryThrottle{failures: map[string][]time.Time{}}
 
 type memoryThrottle struct {
-	mu       sync.Mutex
-	failures map[string][]time.Time
+	mu        sync.Mutex
+	failures  map[string][]time.Time
+	lastSweep time.Time
 }
 
 func (t *memoryThrottle) Blocked(key string) bool {
@@ -48,6 +49,7 @@ func (t *memoryThrottle) Fail(key string) {
 	defer t.mu.Unlock()
 
 	t.failures[key] = append(t.prune(key), time.Now())
+	t.sweep()
 }
 
 func (t *memoryThrottle) Reset(key string) {
@@ -55,6 +57,20 @@ func (t *memoryThrottle) Reset(key string) {
 	defer t.mu.Unlock()
 
 	delete(t.failures, key)
+}
+
+// sweep prunes every key at most once per window, so keys that are never
+// touched again don't accumulate forever. Amortized: one O(keys) pass per
+// window, however many keys an attacker churns through. Caller holds mu.
+func (t *memoryThrottle) sweep() {
+	if time.Since(t.lastSweep) < throttleWindow {
+		return
+	}
+	t.lastSweep = time.Now()
+
+	for key := range t.failures {
+		t.prune(key)
+	}
 }
 
 // prune drops entries older than the window. Caller holds mu.

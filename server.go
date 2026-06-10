@@ -53,10 +53,15 @@ func run() error {
 		addr = "localhost:" + cfg.Port
 	}
 
+	// Full timeout set, not just headers — without ReadTimeout/WriteTimeout a
+	// slow-body client holds a connection open indefinitely.
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           e,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       2 * time.Minute,
 	}
 
 	drained := make(chan struct{})
