@@ -25,8 +25,10 @@
   missing) and fails if it's stale.
   Tests touching only their own uniquely-named rows call `t.Parallel()`.
 - Async work: single-step jobs enqueue through `jobs.Client.InsertTx` in
-  the same transaction as the state change (River); multi-step durable
-  processes live in `flows/` (Inngest). Email sends through the `mailer`
+  the same transaction as the state change (River), or through
+  `jobs.InsertStandalone` when there is genuinely none (enforced by the
+  `jobconfine` analyzer); multi-step durable processes live in `flows/`
+  (Inngest). Email sends through the `mailer`
   seam from workers or flow steps, never from request handlers.
 
 ## Logging

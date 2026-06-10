@@ -83,8 +83,10 @@ the justification lives in the skill that owns the convention.
   missing) and fails if it's stale.
   Tests touching only their own uniquely-named rows call `t.Parallel()`.
 - Async work: single-step jobs enqueue through `jobs.Client.InsertTx` in
-  the same transaction as the state change (River); multi-step durable
-  processes live in `flows/` (Inngest). Email sends through the `mailer`
+  the same transaction as the state change (River), or through
+  `jobs.InsertStandalone` when there is genuinely none (enforced by the
+  `jobconfine` analyzer); multi-step durable processes live in `flows/`
+  (Inngest). Email sends through the `mailer`
   seam from workers or flow steps, never from request handlers.
 
 ## Logging
@@ -131,7 +133,10 @@ Use `bin/sync-agent-config --check` to fail on drift without writing.
 
 Background work has two tiers: `jobs/` (River) for single-step work
 enqueued transactionally — `jobs.Client.InsertTx` in the same transaction
-as the state change, so rollbacks can't orphan jobs — and `flows/`
+as the state change, so rollbacks can't orphan jobs; enqueues with no
+accompanying state change make that claim by name via
+`jobs.InsertStandalone` (the `jobconfine` analyzer confines River's plain
+`Insert` to the jobs package) — and `flows/`
 (Inngest) for durable multi-step orchestration. Workers and flow steps are
 transport; behavior stays in domain packages. Email goes through the
 `mailer` seam from workers or steps, never from request handlers.

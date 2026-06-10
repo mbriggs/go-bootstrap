@@ -30,8 +30,10 @@ args, or persisting progress flags a worker checks.
   runnable only on commit, so a rollback can never leave an orphaned job.
   This transactional handoff is why River over an external broker —
   coupling to Postgres is a feature here. Work with no accompanying state
-  change uses plain `Insert` — the reset request is the example: nothing
-  mutates until the worker runs.
+  change uses `jobs.InsertStandalone` — the name is the no-transaction
+  claim, and the `jobconfine` analyzer confines River's plain `Insert`
+  to the jobs package so the claim is always explicit. The reset request
+  is the example: nothing mutates until the worker runs.
 - Workers are transport. `Work` unpacks args and calls domain code;
   behavior lives in domain packages (`jobs/password_reset_email.go` is the
   shape: one domain call, one `mailer.Send`).
@@ -59,7 +61,8 @@ args, or persisting progress flags a worker checks.
   when it does. Enqueue instead.
 - A bare `Insert` (non-Tx) for work tied to a mutation — if the mutation
   rolls back, the job still runs. Same silent-correctness class as a read
-  escaping a transaction.
+  escaping a transaction; `jobconfine` reports it, and reaching for
+  `InsertStandalone` to silence it is making a false claim.
 - State machines built from chained jobs. That's flows' job; River args
   carrying "current step" is the tell.
 - Hand-editing the River goose migrations (`migrations/003`, `004`). They

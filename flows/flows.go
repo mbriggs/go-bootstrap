@@ -32,7 +32,7 @@ import (
 
 var logger = logging.Logger("flows")
 
-// ErrNotConfigured: Send before Configure is a wiring error — webtest
+// ErrNotConfigured Send before Configure is a wiring error — webtest
 // never configures flows, so a handler reaching here from a test means the
 // event belongs behind a seam or the call belongs elsewhere.
 var ErrNotConfigured = errors.New("flows: Send before Configure — call flows.Configure at boot")

@@ -124,6 +124,6 @@ skills live in `skills/`. The Claude stop hook runs the drift check plus
 | `cmd/conngen`    | `FooTx` → direct `db.Conn` variant codegen                        |
 | `cmd/createuser` | Provision the first login from the CLI                            |
 | `cmd/migrate`    | goose migrations against the PG* environment (`bin/migrate`)      |
-| `cmd/lint`       | Custom analyzers: `txparam`, `connconfine`                        |
+| `cmd/lint`       | Custom analyzers: `txparam`, `connconfine`, `jobconfine`          |
 | `ai/`, `skills/` | Sources for generated agent config + repo-owned skills            |
 | `bin/`           | check, generate, testdb, recreate, migration, setup, coverage, vuln-check, worktree + port tools, agent-config sync |

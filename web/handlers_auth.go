@@ -96,7 +96,7 @@ func PasswordResetRequest(c *echo.Context) error {
 		return fmt.Errorf("recording reset request: %w", err)
 	}
 
-	// No InsertTx here because there is no accompanying state change — the
+	// Standalone enqueue: there is no accompanying state change — the
 	// worker mints the token at send time. Unknown email enqueues nothing
 	// and answers identically.
 	user, err := auth.ByEmail(ctx, email)
@@ -104,7 +104,7 @@ func PasswordResetRequest(c *echo.Context) error {
 		return fmt.Errorf("looking up reset account: %w", err)
 	}
 	if err == nil {
-		if _, err := jobs.Client.Insert(ctx, jobs.PasswordResetEmailArgs{Email: user.Email}, nil); err != nil {
+		if _, err := jobs.InsertStandalone(ctx, jobs.PasswordResetEmailArgs{Email: user.Email}); err != nil {
 			return fmt.Errorf("enqueueing reset email: %w", err)
 		}
 	}

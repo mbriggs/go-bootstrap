@@ -88,6 +88,8 @@ Runtime rules (enforced by `cmd/lint` analyzers, not convention):
   and `webtest` (`connconfine`).
 - Hand-written persistence takes an explicit `tx db.Queryable` param
   (`txparam`); callers use bare forms or open `db.InTx`/`db.ExecInTx`.
+- River's non-Tx insert methods appear only in `jobs/`; everywhere else
+  enqueues via `Client.InsertTx` or `jobs.InsertStandalone` (`jobconfine`).
 - Generic helpers in `db/`: `FindOneTx`/`FindExactlyOneTx`/`FindAllTx`
   (`query.go`),
   `InsertTx`/`UpdateTx`/`DeleteTx` (`mutate.go`) over `mbriggs/pgsql`
@@ -100,7 +102,8 @@ Two tiers, two packages, one dividing line (spelled out in `flows/flows.go`):
 - `jobs/` — River, Postgres-backed. Single-step background work. Work
   tied to a mutation enqueues with `jobs.Client.InsertTx(ctx, tx, args, nil)`
   in the same tx, so a rollback never leaves an orphaned job; work with no
-  accompanying state change uses plain `Insert`. Workers are transport —
+  accompanying state change uses `jobs.InsertStandalone` (`jobconfine`
+  confines River's plain `Insert` to the jobs package). Workers are transport —
   they unpack args and call domain code. The password-reset email is the
   worked example (`jobs/password_reset_email.go`): args carry only the
   email, the worker mints the token at send time.
@@ -158,7 +161,7 @@ migration line — regenerate on River upgrades, don't hand-edit).
 | ------------------------------------------ | -------------------------------------------- |
 | Formatting, shell hygiene                  | `bin/check`: `gofumpt -l`, `shellcheck`      |
 | go.mod tidy                                | `bin/check` tidy-drift step                  |
-| `db.Conn` confinement, explicit tx params  | `cmd/lint` (`connconfine`, `txparam`) via golangci |
+| `db.Conn` confinement, explicit tx params, plain-`Insert` confinement | `cmd/lint` (`connconfine`, `txparam`, `jobconfine`) via golangci |
 | Generated code matches sources             | `bin/check` drift gate on `*.gen.go` / `*_templ.go` (regenerate + stage) |
 | Lint policy                                | `.golangci.yml`                              |
 | No unreachable design-system CSS           | gesso's `cmd/cssdead` via gesso's `bin/check` |

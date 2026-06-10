@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/mbriggs/go-bootstrap/analyzers/connconfine"
+	"github.com/mbriggs/go-bootstrap/analyzers/jobconfine"
 	"github.com/mbriggs/go-bootstrap/analyzers/txparam"
 	"golang.org/x/tools/go/analysis/multichecker"
 )
@@ -14,5 +15,6 @@ func main() {
 	multichecker.Main(
 		txparam.Analyzer,
 		connconfine.Analyzer,
+		jobconfine.Analyzer,
 	)
 }
