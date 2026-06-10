@@ -63,7 +63,7 @@ func run() int {
 		fmt.Fprintln(os.Stderr, "createuser: welcome event skipped:", err)
 		return 0
 	}
-	if err := flows.Send(ctx, "app/user.created", map[string]any{
+	if err := flows.Send(ctx, flows.UserCreated, map[string]any{
 		"user_id": user.ID,
 		"email":   user.Email,
 	}); err != nil {

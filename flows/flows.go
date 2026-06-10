@@ -62,14 +62,20 @@ func Configure() (http.Handler, error) {
 	return c.Serve(), nil
 }
 
-// Send publishes an event for flows to react to. Event names are
-// "noun.action" namespaced by app area, e.g. "app/user.created".
-func Send(ctx context.Context, name string, data map[string]any) error {
+// EventName is an Inngest event name — "noun.action" namespaced by app
+// area, e.g. "app/user.created". Names are wire format: the same constant
+// is referenced by the flow's trigger and every Send call site, so the
+// sender and the consumer can't drift apart on a string. Declare each
+// constant next to the flow that consumes it.
+type EventName string
+
+// Send publishes an event for flows to react to.
+func Send(ctx context.Context, name EventName, data map[string]any) error {
 	if client == nil {
 		return fmt.Errorf("%w (event %s)", ErrNotConfigured, name)
 	}
 
-	if _, err := client.Send(ctx, inngestgo.Event{Name: name, Data: data}); err != nil {
+	if _, err := client.Send(ctx, inngestgo.Event{Name: string(name), Data: data}); err != nil {
 		return fmt.Errorf("sending %s: %w", name, err)
 	}
 

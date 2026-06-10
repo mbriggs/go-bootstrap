@@ -11,10 +11,13 @@ import (
 	"github.com/mbriggs/go-bootstrap/mailer"
 )
 
-// WelcomeData is the payload of "app/user.created". cmd/createuser emits
-// it (best-effort); emit it from signup too when the app grows one:
+// UserCreated fires when a login comes into existence. cmd/createuser
+// emits it (best-effort); emit it from signup too when the app grows one:
 //
-//	flows.Send(ctx, "app/user.created", map[string]any{"user_id": u.ID, "email": u.Email})
+//	flows.Send(ctx, flows.UserCreated, map[string]any{"user_id": u.ID, "email": u.Email})
+const UserCreated EventName = "app/user.created"
+
+// WelcomeData is the payload of UserCreated.
 type WelcomeData struct {
 	UserID int64  `json:"user_id"`
 	Email  string `json:"email"`
@@ -28,7 +31,7 @@ func registerWelcome(c inngestgo.Client) error {
 	_, err := inngestgo.CreateFunction(
 		c,
 		inngestgo.FunctionOpts{ID: "welcome", Retries: new(3)},
-		inngestgo.EventTrigger("app/user.created", nil),
+		inngestgo.EventTrigger(string(UserCreated), nil),
 		func(ctx context.Context, input inngestgo.Input[WelcomeData]) (any, error) {
 			_, err := step.Run(ctx, "send-welcome", func(ctx context.Context) (any, error) {
 				return nil, mailer.Send(ctx, mailer.Message{
