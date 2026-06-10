@@ -52,8 +52,10 @@ func SigninSubmit(c *echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("authenticating: %w", err)
 	}
+	// Best-effort: a failed cleanup only leaves stale failure rows that
+	// expire with the window — not worth failing a valid signin over.
 	if err := ThrottleReset(ctx, throttleKey); err != nil {
-		return fmt.Errorf("clearing signin throttle: %w", err)
+		logger.ErrorContext(ctx, "clearing signin throttle", "error", err)
 	}
 
 	// Rotate the session id on signin to defend against fixation.
