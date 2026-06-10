@@ -1,94 +1,68 @@
 package web
 
 import (
-	"sync"
+	"context"
+	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/mbriggs/go-bootstrap/db"
 )
 
 // Signin throttling: bcrypt's cost slows offline cracking; this slows
 // online guessing. Keys are (client IP, email) so one address can't walk
-// the user list and one user can't be locked out from everywhere.
+// the user list and one user can't be locked out from everywhere. Attempts
+// live in Postgres (throttle_attempts) so the limit holds across processes
+// — an in-memory count would silently stop throttling at the first
+// horizontal scale-out.
 const (
 	throttleLimit  = 5
 	throttleWindow = 15 * time.Minute
 )
 
-// ThrottleStore tracks failed signin attempts per key. The default is
-// in-memory and per-process; a horizontally scaled deployment replaces
-// SigninThrottle at boot with an implementation backed by shared state
-// (e.g. Postgres or Redis) — otherwise throttling silently stops working
-// across instances.
-type ThrottleStore interface {
-	// Blocked reports whether key has reached the failure limit.
-	Blocked(key string) bool
-	// Fail records one failed attempt for key.
-	Fail(key string)
-	// Reset clears key after a successful signin.
-	Reset(key string)
-}
-
-// SigninThrottle is consulted by SigninSubmit. Swap it before the router
-// is built.
-var SigninThrottle ThrottleStore = &memoryThrottle{failures: map[string][]time.Time{}}
-
-type memoryThrottle struct {
-	mu        sync.Mutex
-	failures  map[string][]time.Time
-	lastSweep time.Time
-}
-
-func (t *memoryThrottle) Blocked(key string) bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	return len(t.prune(key)) >= throttleLimit
-}
-
-func (t *memoryThrottle) Fail(key string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	t.failures[key] = append(t.prune(key), time.Now())
-	t.sweep()
-}
-
-func (t *memoryThrottle) Reset(key string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	delete(t.failures, key)
-}
-
-// sweep prunes every key at most once per window, so keys that are never
-// touched again don't accumulate forever. Amortized: one O(keys) pass per
-// window, however many keys an attacker churns through. Caller holds mu.
-func (t *memoryThrottle) sweep() {
-	if time.Since(t.lastSweep) < throttleWindow {
-		return
-	}
-	t.lastSweep = time.Now()
-
-	for key := range t.failures {
-		t.prune(key)
-	}
-}
-
-// prune drops entries older than the window. Caller holds mu.
-func (t *memoryThrottle) prune(key string) []time.Time {
-	cutoff := time.Now().Add(-throttleWindow)
-
-	var kept []time.Time
-	for _, at := range t.failures[key] {
-		if at.After(cutoff) {
-			kept = append(kept, at)
-		}
+// ThrottleBlockedTx reports whether key has reached the attempt limit
+// within the window.
+func ThrottleBlockedTx(ctx context.Context, tx db.Queryable, key string) (bool, error) {
+	rows, err := tx.Query(ctx,
+		"SELECT count(*) FROM throttle_attempts WHERE key = $1 AND attempted_at > now() - make_interval(secs => $2)",
+		key, throttleWindow.Seconds())
+	if err != nil {
+		return false, fmt.Errorf("counting throttle attempts: %w", err)
 	}
 
-	if len(kept) == 0 {
-		delete(t.failures, key)
-	} else {
-		t.failures[key] = kept
+	count, err := pgx.CollectExactlyOneRow(rows, pgx.RowTo[int64])
+	if err != nil {
+		return false, fmt.Errorf("collecting throttle count: %w", err)
 	}
 
-	return kept
+	return count >= throttleLimit, nil
+}
+
+// ThrottleFailTx records one attempt against key. Entries older than the
+// window prune on the way in — attempts are rare, so the sweep rides along
+// instead of needing a scheduled job.
+func ThrottleFailTx(ctx context.Context, tx db.Queryable, key string) error {
+	if _, err := tx.Exec(ctx,
+		"DELETE FROM throttle_attempts WHERE attempted_at < now() - make_interval(secs => $1)",
+		throttleWindow.Seconds()); err != nil {
+		return fmt.Errorf("pruning throttle attempts: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx,
+		"INSERT INTO throttle_attempts (key) VALUES ($1)", key); err != nil {
+		return fmt.Errorf("recording throttle attempt: %w", err)
+	}
+
+	return nil
+}
+
+// ThrottleResetTx clears key after a successful signin.
+func ThrottleResetTx(ctx context.Context, tx db.Queryable, key string) error {
+	if _, err := tx.Exec(ctx,
+		"DELETE FROM throttle_attempts WHERE key = $1", key); err != nil {
+		return fmt.Errorf("clearing throttle attempts: %w", err)
+	}
+
+	return nil
 }

@@ -24,20 +24,50 @@ type row struct {
 
 var errRollback = errors.New("rollback")
 
-func TestFind(t *testing.T) {
+func TestFindOneTakesFirstRowOrNotFound(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 
-	got, err := db.Find[row](context.Background(), "SELECT 1::bigint AS id")
+	got, err := db.FindOne[row](ctx,
+		"SELECT id FROM (VALUES (1::bigint), (2::bigint)) AS v(id) ORDER BY id")
 	if err != nil {
-		t.Fatalf("Find: %v", err)
+		t.Fatalf("FindOne: %v", err)
+	}
+	if got.ID != 1 {
+		t.Fatalf("got %+v, want the first row (ID 1)", got)
 	}
 
-	if got.ID != 1 {
-		t.Fatalf("got %+v, want ID 1", got)
+	_, err = db.FindOne[row](ctx, "SELECT 1::bigint AS id WHERE false")
+	if !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("err = %v, want db.ErrNotFound", err)
 	}
 }
 
-func TestFindTxSeesUncommittedWrites(t *testing.T) {
+func TestFindExactlyOneRejectsAmbiguousMatches(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	got, err := db.FindExactlyOne[row](ctx, "SELECT 1::bigint AS id")
+	if err != nil {
+		t.Fatalf("FindExactlyOne: %v", err)
+	}
+	if got.ID != 1 {
+		t.Fatalf("got %+v, want ID 1", got)
+	}
+
+	_, err = db.FindExactlyOne[row](ctx,
+		"SELECT id FROM (VALUES (1::bigint), (2::bigint)) AS v(id)")
+	if !errors.Is(err, db.ErrTooManyRows) {
+		t.Fatalf("err = %v, want db.ErrTooManyRows", err)
+	}
+
+	_, err = db.FindExactlyOne[row](ctx, "SELECT 1::bigint AS id WHERE false")
+	if !errors.Is(err, db.ErrNotFound) {
+		t.Fatalf("err = %v, want db.ErrNotFound", err)
+	}
+}
+
+func TestFindExactlyOneTxSeesUncommittedWrites(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -52,9 +82,9 @@ func TestFindTxSeesUncommittedWrites(t *testing.T) {
 			return row{}, fmt.Errorf("inserting row: %w", err)
 		}
 
-		got, err := db.FindTx[row](ctx, tx, "SELECT id FROM smoke")
+		got, err := db.FindExactlyOneTx[row](ctx, tx, "SELECT id FROM smoke")
 		if err != nil {
-			t.Errorf("FindTx could not see the transaction's own insert: %v", err)
+			t.Errorf("FindExactlyOneTx could not see the transaction's own insert: %v", err)
 		}
 
 		if got.ID != 42 {

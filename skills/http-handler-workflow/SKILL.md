@@ -54,9 +54,9 @@ and clears them via `web.TakeFlash`.
   failures are throttled per (IP, email); record outcomes via the existing
   pattern in `SigninSubmit` if you add other credential checks. The layered
   defense: bcrypt at cost 12 slows offline cracking (signin is rare, ~100ms
-  is tolerable), the throttle slows online guessing. The default throttle
-  is in-memory; scale-out swaps `web.SigninThrottle` for a
-  `web.ThrottleStore` backed by shared state at boot.
+  is tolerable), the throttle slows online guessing. Throttle attempts
+  live in Postgres (`throttle_attempts`), so the limit holds across
+  processes; `web/throttle.go` owns the policy and the `*Tx` queries.
 - Gate on arbitrary predicates with `web.RequirePolicy(policy)`; policies
   live next to the domain they protect and return an error explaining the
   denial (logged, never rendered).

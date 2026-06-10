@@ -3,6 +3,7 @@ package auth_test
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -46,7 +47,7 @@ func TestAuthenticateRejectsBadPassword(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
-	if _, err := auth.Create(ctx, auth.CreateInput{Email: "badpw@example.com", Password: "right"}); err != nil {
+	if _, err := auth.Create(ctx, auth.CreateInput{Email: "badpw@example.com", Password: "right-pw"}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
@@ -69,11 +70,11 @@ func TestCreateRejectsDuplicateEmailCaseInsensitively(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
-	if _, err := auth.Create(ctx, auth.CreateInput{Email: "dupe@example.com", Password: "pw"}); err != nil {
+	if _, err := auth.Create(ctx, auth.CreateInput{Email: "dupe@example.com", Password: "throwaway-pw"}); err != nil {
 		t.Fatalf("first create: %v", err)
 	}
 
-	_, err := auth.Create(ctx, auth.CreateInput{Email: "DUPE@example.com", Password: "pw"})
+	_, err := auth.Create(ctx, auth.CreateInput{Email: "DUPE@example.com", Password: "throwaway-pw"})
 	if !errors.Is(err, auth.ErrEmailTaken) {
 		t.Fatalf("err = %v, want ErrEmailTaken", err)
 	}
@@ -82,7 +83,7 @@ func TestCreateRejectsDuplicateEmailCaseInsensitively(t *testing.T) {
 func TestCreateDefaultsNameFromEmailLocalPart(t *testing.T) {
 	t.Parallel()
 
-	created, err := auth.Create(t.Context(), auth.CreateInput{Email: "named@example.com", Password: "pw"})
+	created, err := auth.Create(t.Context(), auth.CreateInput{Email: "named@example.com", Password: "throwaway-pw"})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -95,11 +96,26 @@ func TestCreateValidatesRequiredFields(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
-	if _, err := auth.Create(ctx, auth.CreateInput{Password: "pw"}); !errors.Is(err, auth.ErrEmailRequired) {
+	if _, err := auth.Create(ctx, auth.CreateInput{Password: "throwaway-pw"}); !errors.Is(err, auth.ErrEmailRequired) {
 		t.Fatalf("err = %v, want ErrEmailRequired", err)
 	}
 	if _, err := auth.Create(ctx, auth.CreateInput{Email: "novalid@example.com"}); !errors.Is(err, auth.ErrPasswordRequired) {
 		t.Fatalf("err = %v, want ErrPasswordRequired", err)
+	}
+}
+
+func TestCreateEnforcesPasswordPolicy(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	_, err := auth.Create(ctx, auth.CreateInput{Email: "short@example.com", Password: "seven77"})
+	if !errors.Is(err, auth.ErrPasswordTooShort) {
+		t.Fatalf("err = %v, want ErrPasswordTooShort", err)
+	}
+
+	_, err = auth.Create(ctx, auth.CreateInput{Email: "long@example.com", Password: strings.Repeat("a", 73)})
+	if !errors.Is(err, auth.ErrPasswordTooLong) {
+		t.Fatalf("err = %v, want ErrPasswordTooLong", err)
 	}
 }
 
@@ -108,7 +124,7 @@ func TestCreateStoresRolesAndHasRole(t *testing.T) {
 
 	created, err := auth.Create(t.Context(), auth.CreateInput{
 		Email:    "roles@example.com",
-		Password: "pw",
+		Password: "throwaway-pw",
 		Roles:    []string{auth.RoleAdmin, "support"},
 	})
 	if err != nil {
@@ -126,7 +142,7 @@ func TestByEmailMatchesCaseInsensitively(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
-	created, err := auth.Create(ctx, auth.CreateInput{Email: "Mixed.Case@example.com", Password: "pw"})
+	created, err := auth.Create(ctx, auth.CreateInput{Email: "Mixed.Case@example.com", Password: "throwaway-pw"})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -186,7 +202,7 @@ func TestCreateInsideTxParticipatesInRollback(t *testing.T) {
 
 	rollback := errForceRollback
 	err := db.ExecInTx(ctx, func(tx pgx.Tx) error {
-		if _, err := auth.CreateTx(ctx, tx, auth.CreateInput{Email: "rolledback@example.com", Password: "pw"}); err != nil {
+		if _, err := auth.CreateTx(ctx, tx, auth.CreateInput{Email: "rolledback@example.com", Password: "throwaway-pw"}); err != nil {
 			return fmt.Errorf("create in tx: %w", err)
 		}
 		return rollback

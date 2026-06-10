@@ -32,21 +32,29 @@ func SigninSubmit(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	throttleKey := c.RealIP() + "|" + strings.ToLower(email)
-	if SigninThrottle.Blocked(throttleKey) {
+	blocked, err := ThrottleBlocked(ctx, throttleKey)
+	if err != nil {
+		return fmt.Errorf("checking signin throttle: %w", err)
+	}
+	if blocked {
 		SetFlash(c, "error", "too many failed attempts — try again later")
 		return RenderPage(c, PageMeta{Title: "Sign in"}, views.SigninPage(email))
 	}
 
 	user, err := auth.Authenticate(ctx, email, password)
 	if errors.Is(err, auth.ErrInvalidCredentials) {
-		SigninThrottle.Fail(throttleKey)
+		if err := ThrottleFail(ctx, throttleKey); err != nil {
+			return fmt.Errorf("recording failed signin: %w", err)
+		}
 		SetFlash(c, "error", "invalid email or password")
 		return RenderPage(c, PageMeta{Title: "Sign in"}, views.SigninPage(email))
 	}
 	if err != nil {
 		return fmt.Errorf("authenticating: %w", err)
 	}
-	SigninThrottle.Reset(throttleKey)
+	if err := ThrottleReset(ctx, throttleKey); err != nil {
+		return fmt.Errorf("clearing signin throttle: %w", err)
+	}
 
 	// Rotate the session id on signin to defend against fixation.
 	if err := Sessions.RenewToken(ctx); err != nil {
@@ -75,11 +83,18 @@ func PasswordResetRequest(c *echo.Context) error {
 	ctx := c.Request().Context()
 
 	throttleKey := "reset|" + c.RealIP() + "|" + strings.ToLower(email)
-	if SigninThrottle.Blocked(throttleKey) {
+	blocked, err := ThrottleBlocked(ctx, throttleKey)
+	if err != nil {
+		return fmt.Errorf("checking reset throttle: %w", err)
+	}
+	if blocked {
 		SetFlash(c, "error", "too many reset requests — try again later")
 		return RenderPage(c, PageMeta{Title: "Reset password"}, views.PasswordResetRequestPage(email))
 	}
-	SigninThrottle.Fail(throttleKey)
+	// Every request counts, success or not — this endpoint sends mail.
+	if err := ThrottleFail(ctx, throttleKey); err != nil {
+		return fmt.Errorf("recording reset request: %w", err)
+	}
 
 	// No InsertTx here because there is no accompanying state change — the
 	// worker mints the token at send time. Unknown email enqueues nothing
@@ -132,8 +147,8 @@ func PasswordResetConfirm(c *echo.Context) error {
 		SetFlash(c, "error", "that reset link is no longer valid — request a new one")
 		return SafeRedirect(c, "/password-reset")
 	}
-	if errors.Is(err, auth.ErrPasswordRequired) {
-		SetFlash(c, "error", "password is required")
+	if msg := passwordPolicyMessage(err); msg != "" {
+		SetFlash(c, "error", msg)
 		return RenderPage(c, PageMeta{Title: "Choose a new password"}, views.PasswordResetConfirmPage(token))
 	}
 	if err != nil {
@@ -142,6 +157,21 @@ func PasswordResetConfirm(c *echo.Context) error {
 
 	SetFlash(c, "ok", "password updated — sign in with your new password")
 	return SafeRedirect(c, "/signin")
+}
+
+// passwordPolicyMessage maps auth's password-policy sentinels to flash
+// text, or "" when err is something else.
+func passwordPolicyMessage(err error) string {
+	switch {
+	case errors.Is(err, auth.ErrPasswordRequired):
+		return "password is required"
+	case errors.Is(err, auth.ErrPasswordTooShort):
+		return fmt.Sprintf("password must be at least %d characters", auth.PasswordMinLength)
+	case errors.Is(err, auth.ErrPasswordTooLong):
+		return "that password is too long"
+	}
+
+	return ""
 }
 
 func Signout(c *echo.Context) error {

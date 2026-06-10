@@ -83,7 +83,7 @@ func TestResetPasswordRetiresAllOutstandingTokens(t *testing.T) {
 		t.Fatalf("create second reset: %v", err)
 	}
 
-	if _, err := auth.ResetPassword(ctx, first, "new-pw"); err != nil {
+	if _, err := auth.ResetPassword(ctx, first, "replacement-pw"); err != nil {
 		t.Fatalf("reset with first token: %v", err)
 	}
 
@@ -109,12 +109,12 @@ func TestResetPasswordRejectsExpiredToken(t *testing.T) {
 
 	expireResetTokens(t, user.ID)
 
-	if _, err := auth.ResetPassword(ctx, token, "new-pw"); !errors.Is(err, auth.ErrResetTokenInvalid) {
+	if _, err := auth.ResetPassword(ctx, token, "replacement-pw"); !errors.Is(err, auth.ErrResetTokenInvalid) {
 		t.Fatalf("reset with expired token = %v, want ErrResetTokenInvalid", err)
 	}
 }
 
-func TestResetPasswordRejectsEmptyPassword(t *testing.T) {
+func TestResetPasswordEnforcesPasswordPolicy(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
@@ -131,8 +131,11 @@ func TestResetPasswordRejectsEmptyPassword(t *testing.T) {
 	if _, err := auth.ResetPassword(ctx, token, ""); !errors.Is(err, auth.ErrPasswordRequired) {
 		t.Fatalf("reset with empty password = %v, want ErrPasswordRequired", err)
 	}
+	if _, err := auth.ResetPassword(ctx, token, "seven77"); !errors.Is(err, auth.ErrPasswordTooShort) {
+		t.Fatalf("reset with short password = %v, want ErrPasswordTooShort", err)
+	}
 
-	// The failed attempt must not burn the token.
+	// The failed attempts must not burn the token.
 	if err := auth.CheckResetToken(ctx, token); err != nil {
 		t.Fatalf("token after rejected reset = %v, want still live", err)
 	}

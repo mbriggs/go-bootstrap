@@ -17,8 +17,8 @@ separate rules; they are that one judgment applied in different places.
   when it models a stateful process.
 - **Files split by topic, never by kind.** No `types.go`, `helpers.go`,
   or `utils.go` — a file is named for the one responsibility it owns, and
-  everything that responsibility needs lives together (`web/throttle.go`
-  holds the interface, the in-memory implementation, and the instance).
+  everything that responsibility needs lives together (`mailer/mailer.go`
+  holds the seam's interface, the log-sender default, and the instance).
   The namesake file is the package's front door: the global, lifecycle,
   logger, shared sentinels. A one-topic package stays a single namesake
   file until a second topic earns the split; a struct that models a
@@ -32,7 +32,7 @@ separate rules; they are that one judgment applied in different places.
   shouldn't be coupled to — databases are the deliberate exception;
   coupling to Postgres is a feature here. Never inject to make code
   abstractly "testable", but an earned seam pays testing back on its
-  own: an in-memory implementation (`web.ThrottleStore`) substitutes
+  own: a log-backed implementation (`mailer.Outbox`) substitutes
   naturally — architecture solving what a mocking framework papers over.
 - **Globals for thread-safe, single-instance resources** — the connection
   pool (`db.Conn`), the logger registry, the session manager

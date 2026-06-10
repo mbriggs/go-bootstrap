@@ -88,7 +88,8 @@ Runtime rules (enforced by `cmd/lint` analyzers, not convention):
   and `webtest` (`connconfine`).
 - Hand-written persistence takes an explicit `tx db.Queryable` param
   (`txparam`); callers use bare forms or open `db.InTx`/`db.ExecInTx`.
-- Generic helpers in `db/`: `FindTx`/`FindAllTx` (`query.go`),
+- Generic helpers in `db/`: `FindOneTx`/`FindExactlyOneTx`/`FindAllTx`
+  (`query.go`),
   `InsertTx`/`UpdateTx`/`DeleteTx` (`mutate.go`) over `mbriggs/pgsql`
   builders.
 

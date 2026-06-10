@@ -39,7 +39,7 @@ func TestSigninFlowEndToEnd(t *testing.T) {
 
 	user, err := auth.Create(ctx, auth.CreateInput{
 		Email:    "flow@example.com",
-		Password: "flow-pw",
+		Password: "flow-pw-1",
 		Name:     "Flow",
 	})
 	if err != nil {
@@ -70,7 +70,7 @@ func TestSigninFlowEndToEnd(t *testing.T) {
 	}
 
 	// Good credentials redirect back to the page that demanded signin.
-	rec = client.PostForm("/signin", signinForm("flow@example.com", "flow-pw"))
+	rec = client.PostForm("/signin", signinForm("flow@example.com", "flow-pw-1"))
 	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/" {
 		t.Fatalf("signin = %d -> %q, want 303 -> /", rec.Code, rec.Header().Get("Location"))
 	}
@@ -124,13 +124,13 @@ func TestCrossOriginPostIsForbidden(t *testing.T) {
 func TestVanishedSessionUserIsClearedNotFatal(t *testing.T) {
 	ctx := t.Context()
 
-	user, err := auth.Create(ctx, auth.CreateInput{Email: "vanish@example.com", Password: "pw"})
+	user, err := auth.Create(ctx, auth.CreateInput{Email: "vanish@example.com", Password: "vanish-pw"})
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 
 	client := webtest.NewClient(t, webtest.Server(ctx))
-	if rec := client.PostForm("/signin", signinForm("vanish@example.com", "pw")); rec.Code != http.StatusSeeOther {
+	if rec := client.PostForm("/signin", signinForm("vanish@example.com", "vanish-pw")); rec.Code != http.StatusSeeOther {
 		t.Fatalf("signin = %d, want 303", rec.Code)
 	}
 

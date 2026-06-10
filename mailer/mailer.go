@@ -1,8 +1,8 @@
 // Package mailer is the outbound-email seam. Email is an external service
-// the app shouldn't be coupled to, so the seam is earned (like
-// web.ThrottleStore): the default sender logs the message — right for
-// development and tests — and production swaps in a real provider at boot,
-// before any worker that sends mail starts.
+// the app shouldn't be coupled to, so the seam is earned: the default
+// sender logs the message — right for development and tests — and
+// production swaps in a real provider at boot, before any worker that
+// sends mail starts.
 //
 // Sending belongs in a background job, not a request handler: enqueue
 // through the jobs package in the same transaction as the state change the

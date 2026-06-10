@@ -14,7 +14,7 @@ form: `FooTx(ctx context.Context, tx db.Queryable, ...)`. The bare form
 ```go
 // Hand-written: the only place logic lives
 func IndexByNameTx(ctx context.Context, tx db.Queryable, name string) (Index, error) {
-    return db.FindTx[Index](ctx, tx, `SELECT * FROM indexes WHERE name = $1`, name)
+    return db.FindExactlyOneTx[Index](ctx, tx, `SELECT * FROM indexes WHERE name = $1`, name)
 }
 
 // Generated (conngen) — do not write this by hand:

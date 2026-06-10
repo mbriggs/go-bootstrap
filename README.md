@@ -44,7 +44,7 @@ Then verify the skeleton end to end and create the first login:
 
 ```sh
 bin/check        # fmt, shellcheck, build, vet, analyzers, golangci, drift, tests
-go run ./cmd/createuser -email you@example.com -password secret -roles admin
+go run ./cmd/createuser -email you@example.com -password a-secret-pw -roles admin
 air              # dev server with hot reload (templ + go) on :8080
 ```
 

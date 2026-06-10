@@ -121,6 +121,31 @@ func TestPasswordResetUnknownEmailLooksIdentical(t *testing.T) {
 	}
 }
 
+func TestPasswordResetConfirmRejectsShortPassword(t *testing.T) {
+	ctx := t.Context()
+
+	user, err := auth.Make(ctx)
+	if err != nil {
+		t.Fatalf("make user: %v", err)
+	}
+	token, _, err := auth.CreatePasswordReset(ctx, user.Email)
+	if err != nil {
+		t.Fatalf("create reset token: %v", err)
+	}
+
+	client := webtest.NewClient(t, webtest.Server(ctx))
+	rec := client.PostForm("/password-reset/confirm",
+		url.Values{"token": {token}, "password": {"seven77"}})
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "at least 8 characters") {
+		t.Fatalf("short password = %d, want 200 re-render with policy message", rec.Code)
+	}
+
+	// The rejected attempt must not burn the token.
+	if err := auth.CheckResetToken(ctx, token); err != nil {
+		t.Fatalf("token after rejected reset = %v, want still live", err)
+	}
+}
+
 func TestPasswordResetBadTokenBouncesToRequestForm(t *testing.T) {
 	client := webtest.NewClient(t, webtest.Server(t.Context()))
 

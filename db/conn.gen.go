@@ -20,9 +20,14 @@ func FindAll[T any](ctx context.Context, sql string, args ...any) ([]T, error) {
 	return FindAllTx[T](ctx, Conn, sql, args...)
 }
 
-// Find is the direct db.Conn variant of FindTx.
-func Find[T any](ctx context.Context, sql string, args ...any) (T, error) {
-	return FindTx[T](ctx, Conn, sql, args...)
+// FindExactlyOne is the direct db.Conn variant of FindExactlyOneTx.
+func FindExactlyOne[T any](ctx context.Context, sql string, args ...any) (T, error) {
+	return FindExactlyOneTx[T](ctx, Conn, sql, args...)
+}
+
+// FindOne is the direct db.Conn variant of FindOneTx.
+func FindOne[T any](ctx context.Context, sql string, args ...any) (T, error) {
+	return FindOneTx[T](ctx, Conn, sql, args...)
 }
 
 // Insert is the direct db.Conn variant of InsertTx.

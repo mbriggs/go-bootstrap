@@ -70,12 +70,12 @@ func CheckResetTokenTx(ctx context.Context, tx db.Queryable, token string) error
 }
 
 // ResetPasswordTx consumes token and sets the user's password. Returns
-// ErrResetTokenInvalid for unknown/expired/used tokens and
-// ErrPasswordRequired for an empty password. Success retires all of the
-// user's outstanding tokens, not just this one.
+// ErrResetTokenInvalid for unknown/expired/used tokens and the
+// ValidatePassword sentinels for a rejected password. Success retires all
+// of the user's outstanding tokens, not just this one.
 func ResetPasswordTx(ctx context.Context, tx db.Queryable, token, password string) (User, error) {
-	if password == "" {
-		return User{}, ErrPasswordRequired
+	if err := ValidatePassword(password); err != nil {
+		return User{}, err
 	}
 
 	row, err := liveResetTokenTx(ctx, tx, token)
@@ -108,7 +108,7 @@ func ResetPasswordTx(ctx context.Context, tx db.Queryable, token, password strin
 // liveResetTokenTx fetches the unused, unexpired row for token, mapping
 // not-found to ErrResetTokenInvalid.
 func liveResetTokenTx(ctx context.Context, tx db.Queryable, token string) (PasswordResetToken, error) {
-	row, err := db.FindTx[PasswordResetToken](ctx, tx,
+	row, err := db.FindExactlyOneTx[PasswordResetToken](ctx, tx,
 		"SELECT "+resetTokenColumns+
 			" FROM password_reset_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()",
 		hashResetToken(token))

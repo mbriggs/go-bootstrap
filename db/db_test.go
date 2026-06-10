@@ -16,7 +16,7 @@ import (
 func TestHstoreScansIntoMap(t *testing.T) {
 	ctx := context.Background()
 
-	current, err := db.Find[dbName](ctx, "SELECT current_database() AS name")
+	current, err := db.FindExactlyOne[dbName](ctx, "SELECT current_database() AS name")
 	if err != nil {
 		t.Fatalf("reading current database: %v", err)
 	}
@@ -40,9 +40,9 @@ func TestHstoreScansIntoMap(t *testing.T) {
 		Tags map[string]string `db:"tags"`
 	}
 
-	got, err := db.Find[row](ctx, "SELECT 'a=>1,b=>2'::hstore AS tags")
+	got, err := db.FindExactlyOne[row](ctx, "SELECT 'a=>1,b=>2'::hstore AS tags")
 	if err != nil {
-		t.Fatalf("Find: %v", err)
+		t.Fatalf("FindExactlyOne: %v", err)
 	}
 
 	if got.Tags["a"] != "1" || got.Tags["b"] != "2" {

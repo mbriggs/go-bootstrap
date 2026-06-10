@@ -22,7 +22,10 @@ var logger = logging.Logger("db")
 // Conn is the database connection pool. Configure must be called before using
 var Conn *pgxpool.Pool
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound    = errors.New("not found")
+	ErrTooManyRows = errors.New("more than one row matched")
+)
 
 // Configure sets up the database connection pool. If dsn is "", PG ENV vars will be used.
 func Configure(ctx context.Context, dsn string) error {

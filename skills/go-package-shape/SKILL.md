@@ -73,7 +73,7 @@ pull, and cohesion dies there.
   earns the split.
 - **Co-locate a seam's whole story.** The interface, its default
   implementation, and the package-level instance live in one file
-  (`web/throttle.go`) — the reader gets all of it in one screen, and the
+  (`mailer/mailer.go`) — the reader gets all of it in one screen, and the
   seam is still there when a second implementation shows up.
 - **A stateful-process struct gets its own file**, named for the role
   (`logging/logger_manager.go`, `webtest/client.go`).

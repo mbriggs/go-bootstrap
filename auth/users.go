@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mbriggs/pgsql"
@@ -25,6 +26,14 @@ import (
 // rare; users tolerate a 100ms hash check.
 const bcryptCost = 12
 
+// Password policy: long enough to resist online guessing, capped at
+// bcrypt's 72-byte input limit so over-long passwords surface as a domain
+// error instead of x/crypto's opaque one at hash time.
+const (
+	PasswordMinLength = 8
+	passwordMaxBytes  = 72
+)
+
 const emailUniqueIndex = "users_email_lower_unique"
 
 // RoleAdmin is the only role the bootstrap ships; projects add their own
@@ -34,6 +43,8 @@ const RoleAdmin = "admin"
 var (
 	ErrEmailRequired    = errors.New("auth: email is required")
 	ErrPasswordRequired = errors.New("auth: password is required")
+	ErrPasswordTooShort = errors.New("auth: password is shorter than the minimum length")
+	ErrPasswordTooLong  = errors.New("auth: password is longer than 72 bytes (bcrypt limit)")
 
 	// ErrInvalidCredentials is what callers branch on at the seam — never
 	// distinguish "no such email" from "wrong password" at the wire so
@@ -67,8 +78,8 @@ func CreateTx(ctx context.Context, tx db.Queryable, in CreateInput) (User, error
 	if email == "" {
 		return User{}, ErrEmailRequired
 	}
-	if in.Password == "" {
-		return User{}, ErrPasswordRequired
+	if err := ValidatePassword(in.Password); err != nil {
+		return User{}, err
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcryptCost)
@@ -119,15 +130,31 @@ func AuthenticateTx(ctx context.Context, tx db.Queryable, email, password string
 // ByEmailTx returns the user matching email case-insensitively, or
 // db.ErrNotFound.
 func ByEmailTx(ctx context.Context, tx db.Queryable, email string) (User, error) {
-	return db.FindTx[User](ctx, tx,
+	return db.FindExactlyOneTx[User](ctx, tx,
 		"SELECT "+userColumns+" FROM users WHERE lower(email) = lower($1)",
 		strings.TrimSpace(email))
 }
 
 // ByIDTx returns the user with the given id, or db.ErrNotFound.
 func ByIDTx(ctx context.Context, tx db.Queryable, id int64) (User, error) {
-	return db.FindTx[User](ctx, tx,
+	return db.FindExactlyOneTx[User](ctx, tx,
 		"SELECT "+userColumns+" FROM users WHERE id = $1", id)
+}
+
+// ValidatePassword applies the password policy: required, at least
+// PasswordMinLength characters, at most 72 bytes. Only password-setting
+// paths call it — authentication accepts whatever was stored.
+func ValidatePassword(password string) error {
+	switch {
+	case password == "":
+		return ErrPasswordRequired
+	case utf8.RuneCountInString(password) < PasswordMinLength:
+		return ErrPasswordTooShort
+	case len(password) > passwordMaxBytes:
+		return ErrPasswordTooLong
+	}
+
+	return nil
 }
 
 func isEmailUniqueViolation(err error) bool {

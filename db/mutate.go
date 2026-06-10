@@ -34,7 +34,7 @@ func UpdateTx(ctx context.Context, tx Queryable, update *pgsql.UpdateStatement) 
 func InsertTx[T any](ctx context.Context, tx Queryable, insert *pgsql.InsertStatement) (T, error) {
 	sql, args := pgsql.Build(insert)
 
-	return FindTx[T](ctx, tx, sql, args...)
+	return FindExactlyOneTx[T](ctx, tx, sql, args...)
 }
 
 func DeleteTx(ctx context.Context, tx Queryable, del *pgsql.DeleteStatement) (int64, error) {
