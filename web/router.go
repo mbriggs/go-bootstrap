@@ -11,6 +11,8 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/mbriggs/gesso/ui"
 	"github.com/mbriggs/go-bootstrap/logging"
+	"github.com/mbriggs/go-bootstrap/telemetry"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 )
 
 // Router builds the production handler chain. Configure must have run
@@ -32,6 +34,8 @@ func Router(ctx context.Context, publicDir string) *echo.Echo {
 
 	e.Use(middleware.CORS())
 	e.Use(middleware.RequestID())
+	// Request spans no-op until telemetry.Configure installs a provider.
+	e.Use(otelecho.Middleware(telemetry.ServiceName()))
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLoggerWithConfig(loggerConfig()))
 	e.Use(echo.WrapMiddleware(Sessions.LoadAndSave))
@@ -63,6 +67,11 @@ func Router(ctx context.Context, publicDir string) *echo.Echo {
 	e.GET("/signin", SigninForm)
 	e.POST("/signin", SigninSubmit)
 	e.POST("/signout", Signout)
+
+	e.GET("/password-reset", PasswordResetRequestForm)
+	e.POST("/password-reset", PasswordResetRequest)
+	e.GET("/password-reset/confirm", PasswordResetConfirmForm)
+	e.POST("/password-reset/confirm", PasswordResetConfirm)
 
 	e.GET("/", Home, RequireUser)
 

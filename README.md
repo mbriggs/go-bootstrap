@@ -2,12 +2,16 @@
 
 A batteries-included starting point for Go web services: Echo + pgx +
 hand-written SQL migrations (goose) + templ server rendering with scs
-sessions, password auth, and the [gesso](https://github.com/mbriggs/gesso)
-design system (browse it at `/design`), with the project's conventions
-wired in as working tooling — schema-first code generation, custom lint
-analyzers, an integration test harness with database-per-package
-isolation, per-worktree environment isolation, and generated agent
-configuration.
+sessions, password auth (signin + reset), and the
+[gesso](https://github.com/mbriggs/gesso) design system (browse it at
+`/design`), with the project's conventions wired in as working tooling —
+schema-first code generation, custom lint analyzers, an integration test
+harness with database-per-package isolation, per-worktree environment
+isolation, and generated agent configuration. Background jobs ride
+[River](https://riverqueue.com) (transactional enqueue on the same
+Postgres), durable multi-step orchestration rides
+[Inngest](https://www.inngest.com) (`flows/`), and OpenTelemetry tracing
+lights up when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
 
 The bias throughout is simple, ergonomic Go: packages by default, structs
 where there is state to model, essential mess isolated, accidental
@@ -63,6 +67,21 @@ the new package; `bin/generate` emits the pool-backed bare forms. See the
 [go-tx-pattern](skills/go-tx-pattern/SKILL.md) skill for the conventions
 and the reasoning.
 
+## Async work
+
+Two tiers with one dividing line (the package docs carry it): `jobs/`
+(River) for single-step background work — enqueued in the same
+transaction as the state change it follows from, when there is one — and
+`flows/` (Inngest) for multi-step processes that coordinate over time.
+The password-reset email is the worked job example (worker as transport;
+it mints the token at send time so the cleartext never persists). Reach
+for jobs first; reach for flows when you catch yourself building a state
+machine out of chained jobs. The flows dev server is
+`docker compose up inngest` (UI at :8288, set `INNGEST_DEV=1`); the app
+runs fine without it. `cmd/createuser` emits `app/user.created`
+(best-effort), so with the dev server up, creating a user runs the
+welcome flow end to end.
+
 ## Worktrees
 
 Each git worktree gets its own Postgres clones and dev-server port:
@@ -83,10 +102,15 @@ skills live in `skills/`. The Claude stop hook runs the drift check plus
 
 | Path             | What it is                                                       |
 | ---------------- | ---------------------------------------------------------------- |
+| `appname/`       | Module-derived process identity (database names, service name, app id) |
 | `db/`            | Generic data access: `Find[T]`/`Insert[T]`/delete, transactions, row maps |
 | `env/`           | Process configuration: read once, validated, passed as values     |
-| `auth/`          | Users + bcrypt credentials, enumeration-safe sentinels, throttled signin |
+| `auth/`          | Users + bcrypt credentials, enumeration-safe sentinels, throttled signin, password reset tokens |
 | `web/`           | Echo router, scs sessions, templ render path, flash, CSRF gate, `apierror` |
+| `jobs/`          | Background jobs (River): transactional enqueue, workers as transport  |
+| `flows/`         | Durable orchestration (Inngest): checkpointed steps, sleeps, event waits |
+| `mailer/`        | Outbound-email seam; dev sender logs, production swaps `mailer.Outbox` |
+| `telemetry/`     | OTLP tracing, env-gated; otelecho + otelpgx instrumentation           |
 | `views/`         | templ layout + pages (`LayoutData`, signin, home, error)          |
 | ([gesso](https://github.com/mbriggs/gesso)) | Design system dependency: templ components + embedded assets, browse at `/design` |
 | `public/`        | Static assets served at `/public` (minimal `app.css`)             |

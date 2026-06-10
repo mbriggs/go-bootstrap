@@ -35,6 +35,7 @@ func TestLoadRejectsUnknownAppEnv(t *testing.T) {
 func TestLoadReadsOverrides(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("PORT", "9999")
+	t.Setenv("APP_URL", "https://example.com")
 
 	cfg, err := env.Load()
 	if err != nil {
@@ -42,5 +43,32 @@ func TestLoadReadsOverrides(t *testing.T) {
 	}
 	if !cfg.Production() || cfg.Port != "9999" {
 		t.Fatalf("cfg = %+v, want production on 9999", cfg)
+	}
+	if cfg.BaseURL != "https://example.com" {
+		t.Fatalf("BaseURL = %q, want https://example.com", cfg.BaseURL)
+	}
+}
+
+func TestLoadDefaultsBaseURLToLocalhostInDev(t *testing.T) {
+	t.Setenv("APP_ENV", "")
+	t.Setenv("PORT", "7777")
+	t.Setenv("APP_URL", "")
+
+	cfg, err := env.Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.BaseURL != "http://localhost:7777" {
+		t.Fatalf("BaseURL = %q, want localhost fallback on PORT", cfg.BaseURL)
+	}
+}
+
+func TestLoadRequiresAppURLInProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("APP_URL", "")
+
+	_, err := env.Load()
+	if !errors.Is(err, env.ErrAppURLRequired) {
+		t.Fatalf("err = %v, want ErrAppURLRequired", err)
 	}
 }

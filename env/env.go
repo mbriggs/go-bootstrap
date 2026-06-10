@@ -18,12 +18,19 @@ const (
 	Production  AppEnv = "production"
 )
 
-var ErrBadAppEnv = errors.New("APP_ENV must be development, test, or production")
+var (
+	ErrBadAppEnv = errors.New("APP_ENV must be development, test, or production")
+
+	// ErrAppURLRequired: the localhost fallback would silently put dead
+	// links in production email, so production must say its origin.
+	ErrAppURLRequired = errors.New("APP_URL is required in production (emailed links use it as their origin)")
+)
 
 type Env struct {
 	AppEnv    AppEnv
 	Port      string // dev-server port; worktree.env overrides it per worktree
 	PublicDir string // static asset root served at /public
+	BaseURL   string // externally reachable origin, used in emailed links
 }
 
 func (e Env) Dev() bool        { return e.AppEnv == Development }
@@ -39,10 +46,21 @@ func Load() (Env, error) {
 		return Env{}, fmt.Errorf("%w: got %q", ErrBadAppEnv, appEnv)
 	}
 
+	port := getenv("PORT", "8080")
+
+	baseURL := os.Getenv("APP_URL")
+	if baseURL == "" {
+		if appEnv == Production {
+			return Env{}, ErrAppURLRequired
+		}
+		baseURL = "http://localhost:" + port
+	}
+
 	return Env{
 		AppEnv:    appEnv,
-		Port:      getenv("PORT", "8080"),
+		Port:      port,
 		PublicDir: getenv("PUBLIC_DIR", "public"),
+		BaseURL:   baseURL,
 	}, nil
 }
 

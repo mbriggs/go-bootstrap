@@ -9,3 +9,14 @@ services:
       - POSTGRES_USER=${PGUSER}
       - POSTGRES_PASSWORD=${PGPASSWORD}
       - POSTGRES_DB=${PGDATABASE}
+
+  # Inngest dev server for the flows package: `docker compose up inngest`,
+  # UI at http://localhost:8288. Only needed when working on flows; the app
+  # runs fine without it (functions just don't execute). Set INNGEST_DEV=1
+  # for the app so the SDK targets this server.
+  inngest:
+    image: inngest/inngest
+    command: "inngest dev -u http://host.docker.internal:${PORT:-8080}/api/inngest"
+    ports:
+      - "127.0.0.1:8288:8288"
+      - "127.0.0.1:8289:8289"

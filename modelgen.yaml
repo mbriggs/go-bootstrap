@@ -4,3 +4,6 @@ tables:
   - table: users
     package: auth
     type: User
+  - table: password_reset_tokens
+    package: auth
+    type: PasswordResetToken

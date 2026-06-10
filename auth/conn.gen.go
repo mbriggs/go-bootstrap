@@ -25,7 +25,22 @@ func ByID(ctx context.Context, id int64) (User, error) {
 	return ByIDTx(ctx, db.Conn, id)
 }
 
+// CheckResetToken is the direct db.Conn variant of CheckResetTokenTx.
+func CheckResetToken(ctx context.Context, token string) error {
+	return CheckResetTokenTx(ctx, db.Conn, token)
+}
+
+// CreatePasswordReset is the direct db.Conn variant of CreatePasswordResetTx.
+func CreatePasswordReset(ctx context.Context, email string) (string, User, error) {
+	return CreatePasswordResetTx(ctx, db.Conn, email)
+}
+
 // Create is the direct db.Conn variant of CreateTx.
 func Create(ctx context.Context, in CreateInput) (User, error) {
 	return CreateTx(ctx, db.Conn, in)
+}
+
+// ResetPassword is the direct db.Conn variant of ResetPasswordTx.
+func ResetPassword(ctx context.Context, token, password string) (User, error) {
+	return ResetPasswordTx(ctx, db.Conn, token, password)
 }

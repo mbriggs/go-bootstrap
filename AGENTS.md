@@ -78,8 +78,14 @@ the justification lives in the skill that owns the convention.
   changes happen there, against gesso's own `bin/check`.
 - Tests: every DB-touching package needs
   `func TestMain(m *testing.M) { webtest.Main(m) }`. Run `bin/testdb`
-  once (and after migration changes) to build the template database.
+  after migration changes to rebuild the template database — `bin/check`
+  verifies the template against the migrations (builds it only when
+  missing) and fails if it's stale.
   Tests touching only their own uniquely-named rows call `t.Parallel()`.
+- Async work: single-step jobs enqueue through `jobs.Client.InsertTx` in
+  the same transaction as the state change (River); multi-step durable
+  processes live in `flows/` (Inngest). Email sends through the `mailer`
+  seam from workers or flow steps, never from request handlers.
 
 ## Logging
 
@@ -95,8 +101,10 @@ the justification lives in the skill that owns the convention.
 ## Environment
 
 - Process configuration goes through `env.Load()` once at startup —
-  nothing else reads `os.Getenv` for app-level settings (PG* vars are the
-  exception; pgx consumes those directly).
+  nothing else reads `os.Getenv` for app-level settings. SDK-consumed
+  variable families are the exception: PG* (pgx), OTEL_* (OpenTelemetry;
+  tracing turns on with `OTEL_EXPORTER_OTLP_ENDPOINT`), INNGEST_*
+  (`INNGEST_DEV=1` in development).
 - PG connection comes from `.env`; `bin/setup` generates it from the module
   name and mise loads it (`worktree.env` overrides it in worktrees — see
   `bin/worktree-setup` for per-worktree DB and port isolation).
@@ -113,6 +121,19 @@ changing these files.
 Do not edit generated instruction files directly. Edit `ai/common/*.md`,
 `ai/rules/*.md`, or nested `CLAUDE.md` files, then run `bin/sync-agent-config`.
 Use `bin/sync-agent-config --check` to fail on drift without writing.
+
+## Async Work
+
+Background work has two tiers: `jobs/` (River) for single-step work
+enqueued transactionally — `jobs.Client.InsertTx` in the same transaction
+as the state change, so rollbacks can't orphan jobs — and `flows/`
+(Inngest) for durable multi-step orchestration. Workers and flow steps are
+transport; behavior stays in domain packages. Email goes through the
+`mailer` seam from workers or steps, never from request handlers.
+
+Use the repo skill `async-work` at `skills/async-work/SKILL.md` before
+adding any work that outlives a request — it carries the dividing line,
+the enqueue rules, and the River migration upgrade procedure.
 
 ## Schema and Codegen Workflow
 

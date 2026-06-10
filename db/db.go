@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mbriggs/go-bootstrap/logging"
 )
@@ -23,7 +24,15 @@ var ErrNotFound = errors.New("not found")
 
 // Configure sets up the database connection pool. If dsn is "", PG ENV vars will be used.
 func Configure(ctx context.Context, dsn string) error {
-	pool, err := pgxpool.New(ctx, dsn)
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("parsing pool config: %w", err)
+	}
+
+	// Query spans no-op until telemetry.Configure installs a provider.
+	cfg.ConnConfig.Tracer = otelpgx.NewTracer(otelpgx.WithTrimSQLInSpanName())
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("creating connection pool: %w", err)
 	}

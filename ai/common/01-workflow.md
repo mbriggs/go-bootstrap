@@ -20,8 +20,14 @@
   changes happen there, against gesso's own `bin/check`.
 - Tests: every DB-touching package needs
   `func TestMain(m *testing.M) { webtest.Main(m) }`. Run `bin/testdb`
-  once (and after migration changes) to build the template database.
+  after migration changes to rebuild the template database — `bin/check`
+  verifies the template against the migrations (builds it only when
+  missing) and fails if it's stale.
   Tests touching only their own uniquely-named rows call `t.Parallel()`.
+- Async work: single-step jobs enqueue through `jobs.Client.InsertTx` in
+  the same transaction as the state change (River); multi-step durable
+  processes live in `flows/` (Inngest). Email sends through the `mailer`
+  seam from workers or flow steps, never from request handlers.
 
 ## Logging
 
@@ -37,8 +43,10 @@
 ## Environment
 
 - Process configuration goes through `env.Load()` once at startup —
-  nothing else reads `os.Getenv` for app-level settings (PG* vars are the
-  exception; pgx consumes those directly).
+  nothing else reads `os.Getenv` for app-level settings. SDK-consumed
+  variable families are the exception: PG* (pgx), OTEL_* (OpenTelemetry;
+  tracing turns on with `OTEL_EXPORTER_OTLP_ENDPOINT`), INNGEST_*
+  (`INNGEST_DEV=1` in development).
 - PG connection comes from `.env`; `bin/setup` generates it from the module
   name and mise loads it (`worktree.env` overrides it in worktrees — see
   `bin/worktree-setup` for per-worktree DB and port isolation).

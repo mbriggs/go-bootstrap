@@ -26,6 +26,13 @@ func sameOriginPost(r *http.Request) bool {
 	if r.Method != http.MethodPost {
 		return true
 	}
+	// The Inngest endpoint authenticates by request signature, not session
+	// cookie — CSRF needs an ambient cookie to ride, so there is nothing
+	// here for the same-origin gate to protect, and the Inngest server is
+	// legitimately cross-origin.
+	if strings.HasPrefix(r.URL.Path, "/api/inngest") {
+		return true
+	}
 	if origin := r.Header.Get("Origin"); origin != "" {
 		u, err := url.Parse(origin)
 		return err == nil &&

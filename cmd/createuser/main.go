@@ -15,6 +15,7 @@ import (
 
 	"github.com/mbriggs/go-bootstrap/auth"
 	"github.com/mbriggs/go-bootstrap/db"
+	"github.com/mbriggs/go-bootstrap/flows"
 )
 
 func main() {
@@ -55,6 +56,19 @@ func run() int {
 	}
 
 	fmt.Printf("created user %d (%s)\n", user.ID, user.Email)
+
+	// Best-effort: the welcome flow is orchestration sugar, and the first
+	// admin usually gets created before any Inngest server is running.
+	if _, err := flows.Configure(); err != nil {
+		fmt.Fprintln(os.Stderr, "createuser: welcome event skipped:", err)
+		return 0
+	}
+	if err := flows.Send(ctx, "app/user.created", map[string]any{
+		"user_id": user.ID,
+		"email":   user.Email,
+	}); err != nil {
+		fmt.Fprintln(os.Stderr, "createuser: welcome event not delivered (fine if no Inngest server is up):", err)
+	}
 
 	return 0
 }
