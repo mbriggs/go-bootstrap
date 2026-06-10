@@ -2,6 +2,7 @@ package logging
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"go.opentelemetry.io/otel/trace"
@@ -24,7 +25,11 @@ func (h traceHandler) Handle(ctx context.Context, r slog.Record) error {
 		)
 	}
 
-	return h.Handler.Handle(ctx, r)
+	if err := h.Handler.Handle(ctx, r); err != nil {
+		return fmt.Errorf("handling log record: %w", err)
+	}
+
+	return nil
 }
 
 // WithAttrs and WithGroup re-wrap so derived loggers (logger.With(...))

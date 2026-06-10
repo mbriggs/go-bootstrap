@@ -8,11 +8,15 @@ description: Use when adding or changing Echo handlers or middleware under web/.
 ## Shape
 
 Routes and middleware are wired in `web/router.go`; handlers live in
-`web/handlers_*.go`. The shared stack is Echo's `CORS`, `RequestID`,
-`Recover`, and request logging, plus scs sessions
-(`web.Sessions.LoadAndSave` wrapped via `echo.WrapMiddleware`) and
-`web.LoadUser`. Gate signed-in groups with `web.RequireUser`; gate
-role-bound groups with `web.RequireRole("admin")`.
+`web/handlers_*.go` and have the Echo v5 signature
+`func(c *echo.Context) error`. The shared stack is Echo's `RequestID`,
+the hand-rolled request span (`web/tracing.go`), `Recover`, and request
+logging, plus scs sessions (`web.Sessions.LoadAndSave` wrapped via
+`echo.WrapMiddleware`) and `web.LoadUser`. There is no CORS layer —
+sessions are same-origin; add `middleware.CORSWithConfig` with explicit
+origins if the app grows cross-origin consumers. Gate signed-in groups
+with `web.RequireUser`; gate role-bound groups with
+`web.RequireRole("admin")`.
 
 ```go
 g := e.Group("", web.RequireUser)

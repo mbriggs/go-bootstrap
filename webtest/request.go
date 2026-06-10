@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type AppRequest struct {
@@ -46,8 +46,11 @@ func Request[T any](t *testing.T, appReq AppRequest) T {
 	c := Echo.NewContext(req, rec)
 
 	pn, pv := appReq.RoutedState()
-	c.SetParamNames(pn...)
-	c.SetParamValues(pv...)
+	values := make(echo.PathValues, len(pn))
+	for i := range pn {
+		values[i] = echo.PathValue{Name: pn[i], Value: pv[i]}
+	}
+	c.SetPathValues(values)
 
 	// Invoke Handler
 	logger.Info("Requesting", "method", appReq.Method, "path", appReq.Path())

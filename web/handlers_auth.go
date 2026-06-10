@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/mbriggs/go-bootstrap/auth"
 	"github.com/mbriggs/go-bootstrap/db"
@@ -14,7 +14,7 @@ import (
 	"github.com/mbriggs/go-bootstrap/views"
 )
 
-func SigninForm(c echo.Context) error {
+func SigninForm(c *echo.Context) error {
 	if CurrentUser(c) != nil {
 		return SafeRedirect(c, "/")
 	}
@@ -22,7 +22,7 @@ func SigninForm(c echo.Context) error {
 	return RenderPage(c, PageMeta{Title: "Sign in"}, views.SigninPage(""))
 }
 
-func SigninSubmit(c echo.Context) error {
+func SigninSubmit(c *echo.Context) error {
 	if err := ParseForm(c); err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func SigninSubmit(c echo.Context) error {
 }
 
 // PasswordResetRequestForm renders the "enter your email" form.
-func PasswordResetRequestForm(c echo.Context) error {
+func PasswordResetRequestForm(c *echo.Context) error {
 	return RenderPage(c, PageMeta{Title: "Reset password"}, views.PasswordResetRequestPage(""))
 }
 
@@ -66,7 +66,7 @@ func PasswordResetRequestForm(c echo.Context) error {
 // reveals whether the email exists, and every request counts against the
 // throttle — this endpoint sends mail, so it throttles on attempts, not
 // failures.
-func PasswordResetRequest(c echo.Context) error {
+func PasswordResetRequest(c *echo.Context) error {
 	if err := ParseForm(c); err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func PasswordResetRequest(c echo.Context) error {
 
 // PasswordResetConfirmForm checks the emailed token before showing the
 // new-password form, so a dead link fails before the user types anything.
-func PasswordResetConfirmForm(c echo.Context) error {
+func PasswordResetConfirmForm(c *echo.Context) error {
 	token := c.QueryParam("token")
 
 	err := auth.CheckResetToken(c.Request().Context(), token)
@@ -116,7 +116,7 @@ func PasswordResetConfirmForm(c echo.Context) error {
 }
 
 // PasswordResetConfirm consumes the token and sets the new password.
-func PasswordResetConfirm(c echo.Context) error {
+func PasswordResetConfirm(c *echo.Context) error {
 	if err := ParseForm(c); err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func PasswordResetConfirm(c echo.Context) error {
 	return SafeRedirect(c, "/signin")
 }
 
-func Signout(c echo.Context) error {
+func Signout(c *echo.Context) error {
 	if err := Sessions.Destroy(c.Request().Context()); err != nil {
 		return fmt.Errorf("destroying session: %w", err)
 	}
@@ -152,6 +152,6 @@ func Signout(c echo.Context) error {
 	return SafeRedirect(c, "/signin")
 }
 
-func Home(c echo.Context) error {
+func Home(c *echo.Context) error {
 	return RenderPage(c, PageMeta{Title: "Home"}, views.HomePage(CurrentUser(c).Name))
 }

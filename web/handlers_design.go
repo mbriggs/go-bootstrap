@@ -1,7 +1,7 @@
 package web
 
 import (
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/mbriggs/gesso/gallery"
 )
@@ -9,7 +9,7 @@ import (
 // DesignShowcase renders the gesso design-system gallery — every ui
 // component with its states, tokens, and responsive behavior. It is a
 // development reference, hidden in production.
-func DesignShowcase(c echo.Context) error {
+func DesignShowcase(c *echo.Context) error {
 	if prodMode {
 		return echo.ErrNotFound
 	}

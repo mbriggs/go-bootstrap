@@ -7,12 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 	"github.com/mbriggs/gesso/ui"
 	"github.com/mbriggs/go-bootstrap/logging"
-	"github.com/mbriggs/go-bootstrap/telemetry"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -34,10 +32,13 @@ func Router(ctx context.Context, publicDir string) *echo.Echo {
 	// echo.ExtractIPFromXFFHeader(echo.TrustIPRange(...)) for the proxy's range.
 	e.IPExtractor = echo.ExtractIPDirect()
 
-	e.Use(middleware.CORS())
+	// No CORS layer: sessions are same-origin and SameOriginPost gates
+	// writes. v5 makes permissive CORS an explicit choice — when the app
+	// grows cross-origin consumers, add middleware.CORSWithConfig with the
+	// allowed origins spelled out.
 	e.Use(middleware.RequestID())
 	// Request spans no-op until telemetry.Configure installs a provider.
-	e.Use(otelecho.Middleware(telemetry.ServiceName()))
+	e.Use(Tracing)
 	e.Use(requestIDOnSpan)
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLoggerWithConfig(loggerConfig()))
@@ -50,11 +51,11 @@ func Router(ctx context.Context, publicDir string) *echo.Echo {
 
 	// /health is liveness (process up); /ready is readiness (Postgres
 	// reachable) — point load balancers and orchestrators at /ready.
-	e.GET("/health", func(c echo.Context) error {
+	e.GET("/health", func(c *echo.Context) error {
 		return c.String(200, "A-OK!")
 	})
 
-	e.GET("/ready", func(c echo.Context) error {
+	e.GET("/ready", func(c *echo.Context) error {
 		pingCtx, cancel := context.WithTimeout(c.Request().Context(), 2*time.Second)
 		defer cancel()
 
@@ -81,11 +82,11 @@ func Router(ctx context.Context, publicDir string) *echo.Echo {
 	return e
 }
 
-// requestIDOnSpan puts the request id on the otelecho span, so a
+// requestIDOnSpan puts the request id on the request span, so a
 // client-reported X-Request-Id finds its trace. The reverse direction —
 // trace ids on log lines — is the logging package's traceHandler.
 func requestIDOnSpan(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		if rid := c.Response().Header().Get(echo.HeaderXRequestID); rid != "" {
 			trace.SpanFromContext(c.Request().Context()).
 				SetAttributes(attribute.String("http.request_id", rid))
@@ -102,11 +103,10 @@ func loggerConfig() middleware.RequestLoggerConfig {
 		LogLatency:   true,
 		LogMethod:    true,
 		LogURI:       true,
-		LogError:     true,
 		LogRequestID: true,
 		HandleError:  true,
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			// The request context carries the otelecho span, so these
+		LogValuesFunc: func(c *echo.Context, v middleware.RequestLoggerValues) error {
+			// The request context carries the request span, so these
 			// lines pick up trace_id/span_id via logging's traceHandler.
 			ctx := c.Request().Context()
 			if v.Error == nil {

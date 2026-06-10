@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/mbriggs/go-bootstrap/appname"
 	"github.com/mbriggs/go-bootstrap/db"
 	"github.com/mbriggs/go-bootstrap/dev"

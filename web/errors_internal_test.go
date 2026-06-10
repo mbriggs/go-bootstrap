@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 var errKaboom = errors.New("kaboom: connection refused")
@@ -23,7 +23,7 @@ func TestErrorHandlerShowsDetailWithCopyButtonInDev(t *testing.T) {
 	req.Header.Set("Accept", "text/html")
 	rec := httptest.NewRecorder()
 
-	errorHandler(errKaboom, e.NewContext(req, rec))
+	errorHandler(e.NewContext(req, rec), errKaboom)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", rec.Code)
@@ -40,7 +40,7 @@ func TestErrorHandlerHidesDetailOutsideDev(t *testing.T) {
 	req.Header.Set("Accept", "text/html")
 	rec := httptest.NewRecorder()
 
-	errorHandler(errKaboom, e.NewContext(req, rec))
+	errorHandler(e.NewContext(req, rec), errKaboom)
 
 	if strings.Contains(rec.Body.String(), "kaboom") {
 		t.Fatal("internal detail leaked outside dev mode")

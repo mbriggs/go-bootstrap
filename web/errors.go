@@ -2,13 +2,12 @@ package web
 
 import (
 	"bytes"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/mbriggs/go-bootstrap/logging"
 	"github.com/mbriggs/go-bootstrap/views"
@@ -20,15 +19,14 @@ var logger = logging.Logger("web")
 // errorHandler renders failures: templ error pages for browsers, apierror
 // JSON for API clients. Internal detail stays out of responses except in
 // development, where the page shows it with a copy button.
-func errorHandler(err error, c echo.Context) {
-	if c.Response().Committed {
+func errorHandler(c *echo.Context, err error) {
+	if resp, _ := echo.UnwrapResponse(c.Response()); resp != nil && resp.Committed {
 		return
 	}
 
-	status := http.StatusInternalServerError
-	var httpErr *echo.HTTPError
-	if errors.As(err, &httpErr) {
-		status = httpErr.Code
+	status := echo.StatusCode(err)
+	if status == 0 {
+		status = http.StatusInternalServerError
 	}
 
 	if status >= http.StatusInternalServerError {
@@ -83,7 +81,7 @@ func wantsHTML(r *http.Request) bool {
 // The hub is cloned per capture because the global hub's scope stack is
 // not safe for concurrent requests. Only the user id goes on the event;
 // SetRequest already scrubs cookies and auth headers.
-func captureError(err error, c echo.Context) {
+func captureError(err error, c *echo.Context) {
 	hub := sentry.CurrentHub().Clone()
 	hub.Scope().SetRequest(c.Request())
 	hub.Scope().SetTag("request_id", c.Response().Header().Get(echo.HeaderXRequestID))

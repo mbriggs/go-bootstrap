@@ -4,15 +4,15 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // ParseForm parses the request form, converting a malformed body into a
 // 400 instead of silently reading empty values. Call it at the top of any
 // handler that reads form fields.
-func ParseForm(c echo.Context) error {
+func ParseForm(c *echo.Context) error {
 	if err := c.Request().ParseForm(); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "malformed form").SetInternal(err)
+		return echo.NewHTTPError(http.StatusBadRequest, "malformed form").Wrap(err)
 	}
 
 	return nil
@@ -46,7 +46,7 @@ type FormResult struct {
 // internal detail, flashes a safe message (keyed to a field when
 // ErrorFlashKey is set), and redirects back; on success it flashes
 // OKMessage and redirects on.
-func FinishMutation(c echo.Context, result FormResult) error {
+func FinishMutation(c *echo.Context, result FormResult) error {
 	if result.Err != nil {
 		logger.Error(
 			"mutation failed",

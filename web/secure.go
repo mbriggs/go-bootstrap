@@ -6,14 +6,14 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // SameOriginPost rejects cross-origin POSTs (CSRF defense). Browsers send
 // Origin on POST; older or stripped requests fall back to Sec-Fetch-Site.
 // Non-browser clients must send one of the two.
 func SameOriginPost(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		if !sameOriginPost(c.Request()) {
 			return echo.NewHTTPError(http.StatusForbidden, "forbidden")
 		}
@@ -76,7 +76,7 @@ func safeRedirectPath(path string) bool {
 // that the destination is local (leading slash, no scheme/host, no
 // protocol-relative escapes). All handlers should funnel POST→GET
 // redirects through here so redirect validation stays in one place.
-func SafeRedirect(c echo.Context, path string) error {
+func SafeRedirect(c *echo.Context, path string) error {
 	if !safeRedirectPath(path) {
 		path = "/"
 	}

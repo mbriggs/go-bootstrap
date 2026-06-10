@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"github.com/mbriggs/go-bootstrap/logging"
 )
 
@@ -19,7 +19,7 @@ type Response struct {
 }
 
 // JSON renders an Algolia-shaped error with the given status and message.
-func JSON(c echo.Context, status int, message string) error {
+func JSON(c *echo.Context, status int, message string) error {
 	if err := c.JSON(status, Response{Message: message, Status: status}); err != nil {
 		return fmt.Errorf("rendering api error: %w", err)
 	}
@@ -29,7 +29,7 @@ func JSON(c echo.Context, status int, message string) error {
 
 // Internal logs err with request context and renders a generic 500,
 // keeping the internal detail out of the response body.
-func Internal(c echo.Context, err error) error {
+func Internal(c *echo.Context, err error) error {
 	logger.Error(
 		"internal error",
 		"method", c.Request().Method,

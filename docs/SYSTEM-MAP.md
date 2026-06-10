@@ -40,7 +40,9 @@ convention's policy and reasoning lives in its skill under
 Middleware order in `web/router.go`:
 
 ```
-CORS → RequestID → otelecho → Recover → request logger (logs request id)
+RequestID → Tracing (web/tracing.go: hand-rolled request span — otelecho
+                     has no echo/v5 build; request id rides the span)
+  → Recover → request logger (logs request id, trace id via ctx)
   → scs LoadAndSave            (sessions; flash + signin state)
   → SameOriginPost             (web/secure.go: Origin / Sec-Fetch-Site gate,
                                 X-Forwarded-Proto trusted for scheme,

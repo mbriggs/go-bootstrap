@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/mbriggs/go-bootstrap/auth"
 	"github.com/mbriggs/go-bootstrap/db"
@@ -15,7 +15,7 @@ import (
 type ctxUserKey struct{}
 
 // CurrentUser returns the user attached by LoadUser, or nil.
-func CurrentUser(c echo.Context) *auth.User {
+func CurrentUser(c *echo.Context) *auth.User {
 	u, _ := c.Request().Context().Value(ctxUserKey{}).(*auth.User)
 	return u
 }
@@ -23,7 +23,7 @@ func CurrentUser(c echo.Context) *auth.User {
 // LoadUser hydrates the user from the session-bound user id on every
 // request. Cheap one-row read; no caching beyond the request scope.
 func LoadUser(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		ctx := c.Request().Context()
 
 		id := Sessions.GetInt64(ctx, "user_id")
@@ -50,7 +50,7 @@ func LoadUser(next echo.HandlerFunc) echo.HandlerFunc {
 // RequireUser enforces sign-in. Stores the original path so signin can
 // bounce the user back after success.
 func RequireUser(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		if CurrentUser(c) == nil {
 			Sessions.Put(c.Request().Context(), "after_signin", c.Request().RequestURI)
 			return SafeRedirect(c, "/signin")
@@ -65,9 +65,9 @@ func RequireUser(next echo.HandlerFunc) echo.HandlerFunc {
 // explaining the denial (logged, never shown to the client).
 func RequirePolicy(policy func(auth.User) error) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return RequireUser(func(c echo.Context) error {
+		return RequireUser(func(c *echo.Context) error {
 			if err := policy(*CurrentUser(c)); err != nil {
-				return echo.NewHTTPError(http.StatusForbidden, "forbidden").SetInternal(err)
+				return echo.NewHTTPError(http.StatusForbidden, "forbidden").Wrap(err)
 			}
 
 			return next(c)

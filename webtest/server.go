@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/mbriggs/go-bootstrap/db"
 	"github.com/mbriggs/go-bootstrap/env"

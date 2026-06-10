@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/mbriggs/go-bootstrap/webtest"
 )
@@ -35,7 +35,7 @@ func TestServerErrorsReportToSentry(t *testing.T) {
 	events := captureSentryEvents(t)
 
 	e := webtest.Server(t.Context())
-	e.GET("/boom", func(echo.Context) error { return errKaboom })
+	e.GET("/boom", func(*echo.Context) error { return errKaboom })
 	client := webtest.NewClient(t, e)
 
 	rec := client.Do(http.MethodGet, "/boom", nil, map[string]string{"Accept": "text/html"})

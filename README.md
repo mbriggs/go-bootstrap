@@ -112,7 +112,7 @@ skills live in `skills/`. The Claude stop hook runs the drift check plus
 | `jobs/`          | Background jobs (River): transactional enqueue, workers as transport  |
 | `flows/`         | Durable orchestration (Inngest): checkpointed steps, sleeps, event waits |
 | `mailer/`        | Outbound-email seam; dev sender logs, production swaps `mailer.Outbox` |
-| `telemetry/`     | OTLP tracing + Sentry error tracking, both env-gated; otelecho + otelpgx instrumentation |
+| `telemetry/`     | OTLP tracing + Sentry error tracking, both env-gated; request spans (`web/tracing.go`) + otelpgx |
 | `views/`         | templ layout + pages (`LayoutData`, signin, home, error)          |
 | ([gesso](https://github.com/mbriggs/gesso)) | Design system dependency: templ components + embedded assets, browse at `/design` |
 | `public/`        | Static assets served at `/public` (minimal `app.css`)             |
