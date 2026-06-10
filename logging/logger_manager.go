@@ -15,11 +15,15 @@ type Manager struct {
 	sync.RWMutex
 	config  LoggingConfig
 	loggers map[string]*slog.Logger
+	// handlers keeps the charm handlers addressable for reconfiguration;
+	// the slog.Logger's own handler is wrapped in traceHandler.
+	handlers map[string]*log.Logger
 }
 
 func NewManager(settings string, defaultLevel string) (*Manager, error) {
 	m := &Manager{
-		loggers: make(map[string]*slog.Logger),
+		loggers:  make(map[string]*slog.Logger),
+		handlers: make(map[string]*log.Logger),
 	}
 
 	err := m.Configure(settings, defaultLevel)
@@ -39,11 +43,7 @@ func (lm *Manager) Configure(settings string, defaultLevel string) error {
 	lm.config = config
 
 	// Iterate over any existing loggers, and set the output and level.
-	for name := range lm.loggers {
-		handler, ok := lm.loggers[name].Handler().(*log.Logger)
-		if !ok {
-			continue
-		}
+	for name, handler := range lm.handlers {
 		handler.SetOutput(lm.device(name))
 		handler.SetLevel(lm.getLevel(name))
 	}
@@ -70,10 +70,11 @@ func (lm *Manager) Logger(name string) *slog.Logger {
 	})
 	handler.SetLevel(lm.getLevel(name))
 
-	// Create a new slog logger with the handler.
-	logger = slog.New(handler)
+	// The trace wrapper stamps trace_id/span_id from ctx-carrying calls.
+	logger = slog.New(traceHandler{handler})
 
 	lm.loggers[name] = logger
+	lm.handlers[name] = handler
 
 	return logger
 }

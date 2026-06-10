@@ -35,6 +35,10 @@
   runtime filtering via the settings DSL (`"_all,-db:debug"`). No leftover
   debugging — the leveled logger *is* the debug mechanism; if a line isn't
   worth keeping at `Debug` level, it isn't worth committing.
+- When a ctx is in hand, log through the `*Context` variants
+  (`logger.InfoContext(ctx, ...)`) — the handler stamps `trace_id`/`span_id`
+  from the active span, so the line correlates with its trace. Plain calls
+  still work; they just can't be correlated.
 
 ## Style
 - `any`, not `interface{}`. Dot-imports only for `webtest` in test files.

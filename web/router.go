@@ -13,6 +13,8 @@ import (
 	"github.com/mbriggs/go-bootstrap/logging"
 	"github.com/mbriggs/go-bootstrap/telemetry"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Router builds the production handler chain. Configure must have run
@@ -36,6 +38,7 @@ func Router(ctx context.Context, publicDir string) *echo.Echo {
 	e.Use(middleware.RequestID())
 	// Request spans no-op until telemetry.Configure installs a provider.
 	e.Use(otelecho.Middleware(telemetry.ServiceName()))
+	e.Use(requestIDOnSpan)
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLoggerWithConfig(loggerConfig()))
 	e.Use(echo.WrapMiddleware(Sessions.LoadAndSave))
@@ -78,6 +81,20 @@ func Router(ctx context.Context, publicDir string) *echo.Echo {
 	return e
 }
 
+// requestIDOnSpan puts the request id on the otelecho span, so a
+// client-reported X-Request-Id finds its trace. The reverse direction —
+// trace ids on log lines — is the logging package's traceHandler.
+func requestIDOnSpan(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if rid := c.Response().Header().Get(echo.HeaderXRequestID); rid != "" {
+			trace.SpanFromContext(c.Request().Context()).
+				SetAttributes(attribute.String("http.request_id", rid))
+		}
+
+		return next(c)
+	}
+}
+
 func loggerConfig() middleware.RequestLoggerConfig {
 	logger := logging.Logger("request")
 	return middleware.RequestLoggerConfig{
@@ -89,16 +106,19 @@ func loggerConfig() middleware.RequestLoggerConfig {
 		LogRequestID: true,
 		HandleError:  true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			// The request context carries the otelecho span, so these
+			// lines pick up trace_id/span_id via logging's traceHandler.
+			ctx := c.Request().Context()
 			if v.Error == nil {
 				logger.LogAttrs(
-					context.Background(), slog.LevelInfo, fmt.Sprintf("%s %s", v.Method, v.URI),
+					ctx, slog.LevelInfo, fmt.Sprintf("%s %s", v.Method, v.URI),
 					slog.Int("status", v.Status),
 					slog.Duration("latency", v.Latency),
 					slog.String("request_id", v.RequestID),
 				)
 			} else {
 				logger.LogAttrs(
-					context.Background(), slog.LevelError, "REQUEST_ERROR",
+					ctx, slog.LevelError, "REQUEST_ERROR",
 					slog.String("uri", v.URI),
 					slog.Int("status", v.Status),
 					slog.String("err", v.Error.Error()),
