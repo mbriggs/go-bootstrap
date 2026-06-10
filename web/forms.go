@@ -46,6 +46,10 @@ type FormResult struct {
 // internal detail, flashes a safe message (keyed to a field when
 // ErrorFlashKey is set), and redirects back; on success it flashes
 // OKMessage and redirects on.
+//
+// Errors here never become 5xx — the redirect hides them from the error
+// handler — so unexpected ones report to Sentry from this seam. A
+// UserMessager is expected user feedback, not an incident.
 func FinishMutation(c *echo.Context, result FormResult) error {
 	if result.Err != nil {
 		logger.Error(
@@ -53,6 +57,12 @@ func FinishMutation(c *echo.Context, result FormResult) error {
 			"path", c.Request().URL.Path,
 			"error", result.Err,
 		)
+
+		var um UserMessager
+		if !errors.As(result.Err, &um) {
+			captureError(result.Err, c)
+		}
+
 		SetKeyedFlash(c, "error", result.ErrorFlashKey, UserMessage(result.Err, "could not save changes"))
 		return SafeRedirect(c, result.RedirectTo)
 	}
