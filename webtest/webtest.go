@@ -14,14 +14,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
-	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
+	"github.com/mbriggs/go-bootstrap/appname"
 	"github.com/mbriggs/go-bootstrap/db"
 	"github.com/mbriggs/go-bootstrap/dev"
 	"github.com/mbriggs/go-bootstrap/logging"
@@ -85,26 +84,15 @@ func run(m *testing.M) (int, error) {
 	return m.Run(), nil
 }
 
-// projectName derives a Postgres-safe identifier from the module path, so
-// the harness works unmodified in any project bootstrapped from this one.
+// projectName is appname.Postgres with fail-loud semantics: silently wrong
+// database names would break test isolation.
 func projectName() string {
-	info, ok := debug.ReadBuildInfo()
-	if !ok || info.Main.Path == "" {
+	name := appname.Postgres()
+	if name == "" {
 		panic("webtest: no module build info to derive project name from")
 	}
 
-	name := strings.ToLower(path.Base(info.Main.Path))
-
-	var b strings.Builder
-	for _, r := range name {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
-			b.WriteRune(r)
-		} else {
-			b.WriteRune('_')
-		}
-	}
-
-	return b.String()
+	return name
 }
 
 func createTestDB(ctx context.Context, name string) error {
@@ -118,9 +106,11 @@ func createTestDB(ctx context.Context, name string) error {
 		return fmt.Errorf("dropping stale test db %s: %w", name, err)
 	}
 
-	// Parallel test packages clone the template concurrently, and Postgres
-	// rejects a clone while another clone holds the template (SQLSTATE 55006),
-	// so contention here is expected and retried rather than fatal.
+	// Two transient failures are expected and retried: parallel test
+	// packages clone concurrently and Postgres rejects a clone while
+	// another holds the template (SQLSTATE 55006), and bin/testdb's
+	// drop-and-rename swap leaves the template absent for a few
+	// milliseconds. Anything that persists through the retries is real.
 	for attempt := 0; ; attempt++ {
 		_, err = admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", name, templateDB))
 
@@ -128,11 +118,11 @@ func createTestDB(ctx context.Context, name string) error {
 			return nil
 		}
 
-		if strings.Contains(err.Error(), "does not exist") {
-			return fmt.Errorf("template database %s missing — run bin/testdb first: %w", templateDB, err)
-		}
-
 		if attempt >= 20 {
+			if strings.Contains(err.Error(), "does not exist") {
+				return fmt.Errorf("template database %s missing — run bin/testdb first: %w", templateDB, err)
+			}
+
 			return fmt.Errorf("creating test db %s from template: %w", name, err)
 		}
 

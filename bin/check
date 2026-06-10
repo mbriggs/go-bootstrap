@@ -2,7 +2,10 @@
 #
 # The full verification gate: format, shellcheck, build, vet, custom
 # analyzers, stock linters, go.mod tidy drift, codegen drift, and the test
-# suite against a fresh template DB.
+# suite. The test template is verified, not rebuilt (bin/testdb --check):
+# missing builds once, stale fails — rebuilding after a migration change
+# is a deliberate act (bin/testdb), and the agent stop hook runs this
+# whole gate, so it stays fast.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -48,7 +51,7 @@ if [ -n "$drift" ]; then
   exit 1
 fi
 
-bin/testdb
-go test ./...
+bin/testdb --check
+go test -race ./...
 
 echo "all checks passed"

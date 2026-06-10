@@ -1,22 +1,87 @@
 #!/usr/bin/env bash
 #
-# Recreates the test template database and migrates it. Test packages clone
-# this template (see webtest.Main), so run this after changing migrations.
-# The name derives from the module path: <project>_template.
+# Rebuilds the test template database. Test packages clone this template
+# (see webtest.Main), so run after changing migrations. The name derives
+# from the module path: <project>_template.
+#
+# bin/testdb --check verifies the template instead of rebuilding it, by
+# comparing a content fingerprint of migrations/ stamped at build time —
+# so edited migration files count as stale, not just added or removed
+# ones. A missing template is built (fresh clone, CI — one unambiguous
+# remedy); a stale one is an error naming the fix. bin/check uses this so
+# the gate (and the agent stop hook wrapping it) stays fast and never
+# rebuilds the template behind your back mid schema change.
+#
+# Rebuilds go through a scratch database swapped in at the end: the stop
+# hook gets killed whenever a new prompt arrives, and an in-place
+# drop/create/migrate killed mid-run leaves a silently empty template that
+# every test clone inherits. With the swap, a kill leaves either the old
+# template (build phase) or a missing one (the swap window, milliseconds
+# wide) — webtest retries through the latter and fails loudly if it
+# persists.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 project=$(basename "$(GOWORK=off go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
 TEMPLATE_DB="${TEMPLATE_DB:-${project}_template}"
+BUILD_DB="${TEMPLATE_DB}_build_$$"
 
-psql -d postgres -qc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$TEMPLATE_DB'" >/dev/null
-dropdb --if-exists "$TEMPLATE_DB"
-createdb "$TEMPLATE_DB"
+# Fingerprint of migration names + contents. The template is stamped with
+# it at build time, so --check catches edits to already-applied migration
+# files (bin/migrate redo workflows), not just added or removed versions.
+migrations_fingerprint() {
+  if ls migrations/*.sql >/dev/null 2>&1; then
+    shasum -a 256 migrations/*.sql | shasum -a 256 | cut -d' ' -f1
+  else
+    echo "none"
+  fi
+}
+
+if [ "${1:-}" = "--check" ]; then
+  want="migrations:$(migrations_fingerprint)"
+  have=$(psql -X -d postgres -tAc \
+    "SELECT 'fingerprint=' || coalesce(shobj_description(oid, 'pg_database'), 'unset') FROM pg_database WHERE datname = '$TEMPLATE_DB'")
+
+  case "$have" in
+  "")
+    echo "test template $TEMPLATE_DB missing — building it"
+    exec "$0"
+    ;;
+  "fingerprint=$want")
+    exit 0
+    ;;
+  *)
+    echo "test template $TEMPLATE_DB does not match migrations/ (edited, added, or removed) — run bin/testdb" >&2
+    exit 1
+    ;;
+  esac
+fi
+
+cleanup() { dropdb --if-exists "$BUILD_DB" 2>/dev/null || true; }
+trap cleanup EXIT
+
+# Scratch databases orphaned by previous killed runs. -X keeps psqlrc
+# output out of the database list.
+psql -X -d postgres -tAc "SELECT datname FROM pg_database WHERE datname LIKE '${TEMPLATE_DB}_build_%'" |
+  while read -r stale; do
+    dropdb --if-exists "$stale"
+  done
+
+createdb "$BUILD_DB"
 if ls migrations/*.sql >/dev/null 2>&1; then
-  PGDATABASE="$TEMPLATE_DB" go run ./cmd/migrate up
+  PGDATABASE="$BUILD_DB" go run ./cmd/migrate up
 else
   echo "no migrations yet — database is empty"
 fi
+
+# Stamp the fingerprint --check compares against. The comment is attached
+# to the database oid, so it survives the rename below.
+psql -X -d postgres -qc "COMMENT ON DATABASE \"$BUILD_DB\" IS 'migrations:$(migrations_fingerprint)'"
+
+psql -X -d postgres -qc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('$TEMPLATE_DB', '$BUILD_DB')" >/dev/null
+dropdb --if-exists "$TEMPLATE_DB"
+psql -X -d postgres -qc "ALTER DATABASE \"$BUILD_DB\" RENAME TO \"$TEMPLATE_DB\""
+trap - EXIT
 
 echo "test template $TEMPLATE_DB ready"
