@@ -224,13 +224,18 @@ func goType(col column) (string, error) {
 		"date":        "time.Time",
 		"bytea":       "[]byte",
 		"numeric":     "string",
+		// db.Configure registers the hstore codec per connection; NULL
+		// values inside an hstore error on scan — use jsonb when values
+		// can be NULL.
+		"hstore": "map[string]string",
 	}[col.UDT]
 
 	if !ok {
 		return "", fmt.Errorf("column %s: no Go mapping for Postgres type %q — add one to modelgen", col.Name, col.UDT)
 	}
 
-	if col.Nullable && !strings.HasPrefix(base, "[]") {
+	// Slices and maps carry their own null (nil), so no pointer wrap.
+	if col.Nullable && !strings.HasPrefix(base, "[]") && !strings.HasPrefix(base, "map[") {
 		return "*" + base, nil
 	}
 
