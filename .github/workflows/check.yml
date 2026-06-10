@@ -30,7 +30,6 @@ jobs:
       PGUSER: go_bootstrap
       PGPASSWORD: go_bootstrap
       PGDATABASE: go_bootstrap_dev
-      TERN_MIGRATIONS: migrations
 
     steps:
       - uses: actions/checkout@v4

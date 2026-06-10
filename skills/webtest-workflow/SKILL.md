@@ -43,7 +43,7 @@ points the harness at the worktree's own template clone.
 - Tests that assert on table-wide state stay serial.
 - There is no per-test rollback — the database lives for the package run.
   Use unique names (`fmt.Sprintf("user-%d@example.com", i)` or
-  `fixtureid.For(table, name)`) instead of assuming a clean table.
+  `fixture.ID(table, name)`) instead of assuming a clean table.
 
 ## Factories
 

@@ -27,7 +27,7 @@ import (
 	"github.com/mbriggs/go-bootstrap/logging"
 )
 
-var Echo *echo.Echo = echo.New()
+var Echo = echo.New()
 
 var logger = logging.Logger("webtest")
 

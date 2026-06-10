@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE users (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   email text NOT NULL,
@@ -10,6 +11,5 @@ CREATE TABLE users (
 
 CREATE UNIQUE INDEX users_email_lower_unique ON users (lower(email));
 
----- create above / drop below ----
-
+-- +goose Down
 DROP TABLE users;

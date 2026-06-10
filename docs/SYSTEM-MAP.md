@@ -1,8 +1,9 @@
 # System map
 
 Where things live, how a request flows, and which tool enforces which
-invariant. [STANDARDS.md](../STANDARDS.md) explains *why* the conventions
-exist; this page is the *where*.
+invariant. [CLAUDE.md](../CLAUDE.md) carries the philosophy; each
+convention's policy and reasoning lives in its skill under
+[skills/](../skills/). This page is the *where*.
 
 ## Boot
 
@@ -51,15 +52,15 @@ messages ride the session (`web/flash.go`).
 One model's lifecycle:
 
 ```
-bin/migration foo  →  migrations/NNN_foo.sql  →  tern migrate
-modelgen.yaml entry  →  bin/generate  →  foo/model_gen.go   (struct + ToRowMap)
-hand-write FooTx(ctx, tx db.Queryable, ...)  →  bin/generate  →  foo/delegates_gen.go
+bin/migration foo  →  migrations/<version>_foo.sql  →  bin/migrate up
+modelgen.yaml entry  →  bin/generate  →  foo/model.gen.go   (struct + ToRowMap)
+hand-write FooTx(ctx, tx db.Queryable, ...)  →  bin/generate  →  foo/conn.gen.go
 ```
 
 Runtime rules (enforced by `cmd/lint` analyzers, not convention):
 
-- `db.Conn` appears only in generated delegates, `db/`, `main`, and
-  `webtest` (`connconfine`).
+- `db.Conn` appears only in generated `conn.gen.go` files, `db/`, `main`,
+  and `webtest` (`connconfine`).
 - Hand-written persistence takes an explicit `tx db.Queryable` param
   (`txparam`); callers use bare forms or open `db.InTx`/`db.ExecInTx`.
 - Generic helpers in `db/`: `FindTx`/`FindAllTx` (`query.go`),
@@ -92,8 +93,8 @@ Runtime rules (enforced by `cmd/lint` analyzers, not convention):
 
 - `webtest.Main(m)` in a package's `TestMain` clones
   `<project>_template` → `<project>_test_<pid>`: database per package, no
-  per-test rollback, uniqueness (factories, `testdata.NewSequence`,
-  `fixtureid.For`) is what makes `t.Parallel()` safe.
+  per-test rollback, uniqueness (factories, `fixture.NewSequence`,
+  `fixture.ID`) is what makes `t.Parallel()` safe.
 - `webtest.Server(ctx)` is the production-wired Echo app;
   `webtest.NewClient` carries cookies so signin flows test end to end.
 - `auth.Make(ctx, opts...)` is the factory convention; new aggregates
@@ -109,7 +110,7 @@ Runtime rules (enforced by `cmd/lint` analyzers, not convention):
 | Formatting, shell hygiene                  | `bin/check`: `gofumpt -l`, `shellcheck`      |
 | go.mod tidy                                | `bin/check` tidy-drift step                  |
 | `db.Conn` confinement, explicit tx params  | `cmd/lint` (`connconfine`, `txparam`) via golangci |
-| Generated code matches sources             | `bin/check` drift gate on `*_gen.go` / `*_templ.go` (regenerate + stage) |
+| Generated code matches sources             | `bin/check` drift gate on `*.gen.go` / `*_templ.go` (regenerate + stage) |
 | Lint policy                                | `.golangci.yml`                              |
 | No unreachable design-system CSS           | gesso's `cmd/cssdead` via gesso's `bin/check` |
 | Tests against real Postgres                | `bin/check` → `bin/testdb` + `go test ./...` |
@@ -117,6 +118,27 @@ Runtime rules (enforced by `cmd/lint` analyzers, not convention):
 | Agent docs match `ai/` sources             | `bin/sync-agent-config --check` (stop hook)  |
 | All of the above on every agent stop       | `bin/agent-stop-check`                       |
 | All of the above on every push             | `.github/workflows/check.yml`                |
+
+## Tooling reference
+
+| Command                 | What it does                                                                  |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `bin/check`             | Full gate: fmt, shellcheck, build, vet, analyzers, golangci, tidy/codegen drift, tests |
+| `bin/generate`          | Regenerate templ output, models (live schema), conn variants (signatures)     |
+| `bin/testdb`            | Recreate + migrate the test template database                                 |
+| `bin/migration`         | Create a new goose migration                                                  |
+| `bin/migrate`           | Run migrations (`up`, `down`, `status`, … via cmd/migrate)                    |
+| `bin/recreate`          | Recreate + migrate the dev database                                           |
+| `bin/setup`             | Install the toolchain (mise) and generate `.env`                              |
+| `bin/vuln-check`        | govulncheck — separate from `bin/check` because the vuln DB moves on its own  |
+| `bin/coverage`          | Cross-package coverage with a first-party minimum                             |
+| `bin/worktree-setup`    | Per-worktree Postgres clones + port allocation (writes `worktree.env`)        |
+| `bin/worktree-teardown` | Drop the worktree's clones, free its port                                     |
+| `bin/sync-agent-config` | Regenerate agent instruction files from `ai/`                                 |
+
+Tool versions are pinned in `.mise.toml`; mise also loads `.env`
+(gitignored; start from `.env.example`) and `worktree.env`. Custom
+analyzers live in `analyzers/` and run via `go run ./cmd/lint ./...`.
 
 ## Directory map
 

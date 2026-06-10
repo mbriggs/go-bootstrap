@@ -52,7 +52,7 @@ set +a
 
 [[ -n "${PGDATABASE:-}" ]] || { echo "PGDATABASE missing in .env" >&2; exit 1; }
 
-project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+project=$(basename "$(GOWORK=off go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
 SRC_DEV_DB="$PGDATABASE"
 SRC_TEMPLATE_DB="${project}_template"
 DEV_DB="${SRC_DEV_DB}_${port}"

@@ -1,20 +1,20 @@
-package testdata
+package fixture
 
 import (
 	"math/rand/v2"
 	"sync"
 )
 
-// DataSequence generates short random codes, unique within a run, for test
+// Sequence generates short random codes, unique within a run, for test
 // data naming. Parallel tests rely on this uniqueness to stay row-scoped,
 // so Next is safe for concurrent use.
-type DataSequence struct {
+type Sequence struct {
 	sync.Mutex
 	used map[string]bool
 }
 
-func NewSequence() *DataSequence {
-	return &DataSequence{
+func NewSequence() *Sequence {
+	return &Sequence{
 		used: make(map[string]bool),
 	}
 }
@@ -22,14 +22,14 @@ func NewSequence() *DataSequence {
 const maxAttempts = 1000
 
 // Next returns a code not previously returned by this sequence.
-func (ds *DataSequence) Next() string {
-	ds.Lock()
-	defer ds.Unlock()
+func (s *Sequence) Next() string {
+	s.Lock()
+	defer s.Unlock()
 
-	for attempts := 0; attempts < maxAttempts; attempts++ {
+	for range maxAttempts {
 		val := generateRandomString(5)
-		if _, exists := ds.used[val]; !exists {
-			ds.used[val] = true
+		if _, exists := s.used[val]; !exists {
+			s.used[val] = true
 			return val
 		}
 	}
@@ -42,7 +42,7 @@ func generateRandomString(length int) string {
 
 	chars := make([]byte, length)
 	for i := range chars {
-		chars[i] = alphanumeric[rand.IntN(len(alphanumeric))]
+		chars[i] = alphanumeric[rand.IntN(len(alphanumeric))] //nolint:gosec // codes name test rows; uniqueness, not unpredictability
 	}
 
 	return string(chars)

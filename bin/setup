@@ -27,7 +27,7 @@ create_env_file() {
   fi
 
   local project
-  project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+  project=$(basename "$(GOWORK=off go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
 
   cat > .env <<ENVEOF
 PGUSER=$project
@@ -35,8 +35,6 @@ PGPASSWORD=$project
 PGDATABASE=${project}_dev
 PGHOST=localhost
 PGPORT=5432
-
-TERN_MIGRATIONS=migrations
 ENVEOF
 
   echo "Created .env for $project."

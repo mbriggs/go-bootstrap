@@ -7,14 +7,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+project=$(basename "$(GOWORK=off go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
 TEMPLATE_DB="${TEMPLATE_DB:-${project}_template}"
 
 psql -d postgres -qc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$TEMPLATE_DB'" >/dev/null
 dropdb --if-exists "$TEMPLATE_DB"
 createdb "$TEMPLATE_DB"
-if ls "${TERN_MIGRATIONS:-migrations}"/*.sql >/dev/null 2>&1; then
-  PGDATABASE="$TEMPLATE_DB" tern migrate
+if ls migrations/*.sql >/dev/null 2>&1; then
+  PGDATABASE="$TEMPLATE_DB" go run ./cmd/migrate up
 else
   echo "no migrations yet — database is empty"
 fi

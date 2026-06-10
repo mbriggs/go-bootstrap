@@ -5,7 +5,10 @@ claudePaths:
 ---
 
 Use the repo skill `webtest-workflow` at `skills/webtest-workflow/SKILL.md`
-before adding or changing DB-backed tests, fixtures, or factories.
+before adding or changing DB-backed tests, fixtures, or factories; the
+`go-integration-testing` skill at `skills/go-integration-testing/SKILL.md`
+carries the policy (when a mock is ever justified, the t.Parallel
+contract).
 
 Tests hit a real per-package Postgres clone via
 `func TestMain(m *testing.M) { webtest.Main(m) }`. Avoid mocking ordinary

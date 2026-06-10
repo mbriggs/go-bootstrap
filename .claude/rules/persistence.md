@@ -7,15 +7,16 @@ paths:
 # The Transaction Pattern
 
 Persistence functions are hand-written only in their
-`FooTx(ctx, tx db.Queryable, ...)` form; `bin/generate` (cmd/txgen) emits the
-pool-backed bare delegate. There is no ambient transaction — nothing rides in
+`FooTx(ctx, tx db.Queryable, ...)` form; `bin/generate` (cmd/conngen) emits the
+direct `db.Conn` variant. There is no ambient transaction — nothing rides in
 `context.Context` — because `pgx.Tx` is not concurrency-safe and implicit
 transactions hide that hazard.
 
-`db.Conn` is confined to generated files, the db package's own bootstrap and
-tx boundary, the webtest harness, and `package main` — the `connconfine`
-analyzer enforces this. A declared-but-unused `tx` parameter is an error
+`db.Conn` is confined to generated `conn.gen.go` files, the db package's own
+bootstrap and tx boundary, the webtest harness, and `package main` — the
+`connconfine` analyzer enforces this. A declared-but-unused `tx` parameter is an error
 (`txparam`): it means reads or writes are escaping the transaction.
 
-See the "transaction pattern" section of STANDARDS.md for rationale and
-examples.
+Use the repo skill `go-tx-pattern` at `skills/go-tx-pattern/SKILL.md` for
+rationale and examples before writing any function that queries or mutates
+the database.

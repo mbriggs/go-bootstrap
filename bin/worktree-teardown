@@ -13,7 +13,7 @@ if [[ "$WORKTREE_DIR" == "$ROOT_DIR" ]]; then
   exit 1
 fi
 
-project=$(basename "$(go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+project=$(basename "$(GOWORK=off go list -m)" | tr '-' '_' | tr '[:upper:]' '[:lower:]')
 ALLOC_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/$project/port-allocations.tsv"
 
 # Recover the allocated port from the registry (single source of truth).

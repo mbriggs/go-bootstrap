@@ -30,7 +30,11 @@ Server-rendered pages go through `web.RenderPage(c, meta, component)`:
 - Use `web.RenderPageData` only when the component itself needs the
   request-scoped `views.LayoutData`.
 
-JSON endpoints render via `c.JSON` and shape errors with `web/apierror`.
+JSON endpoints render via `c.JSON` and shape errors with `web/apierror` —
+a flat `{"message", "status"}` shape clients can parse and branch on.
+`apierror.Internal` logs the detail and returns a generic 500; internals
+never cross the boundary. If the service mimics an existing API, mimic
+its error shape and status codes too.
 
 Set flashes via `web.SetFlash(c, "ok" | "error", msg)`; the next render pops
 and clears them via `web.TakeFlash`.
@@ -44,7 +48,11 @@ and clears them via `web.TakeFlash`.
 - `auth.Authenticate` collapses unknown-email and bad-password into the same
   `auth.ErrInvalidCredentials` — don't distinguish them at the wire. Signin
   failures are throttled per (IP, email); record outcomes via the existing
-  pattern in `SigninSubmit` if you add other credential checks.
+  pattern in `SigninSubmit` if you add other credential checks. The layered
+  defense: bcrypt at cost 12 slows offline cracking (signin is rare, ~100ms
+  is tolerable), the throttle slows online guessing. The default throttle
+  is in-memory; scale-out swaps `web.SigninThrottle` for a
+  `web.ThrottleStore` backed by shared state at boot.
 - Gate on arbitrary predicates with `web.RequirePolicy(policy)`; policies
   live next to the domain they protect and return an error explaining the
   denial (logged, never rendered).
@@ -67,7 +75,9 @@ if errors.Is(err, auth.ErrInvalidCredentials) {
 }
 ```
 
-Sentinel errors (`errors.Is`) are the discriminator — see STANDARDS.md.
+Sentinel errors (`errors.Is`) are the discriminator; they live in the
+package that owns the condition, and custom error types wait until
+something must carry data a sentinel can't.
 
 ## Forms
 

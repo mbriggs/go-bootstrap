@@ -1,10 +1,12 @@
 // Package connconfine reports references to the db package's global
-// connection pool outside its allowed homes: generated delegate files, the
-// db package's own bootstrap (db.go) and transaction boundary (tx.go),
+// connection pool outside its allowed homes: conngen's output (conn.gen.go),
+// the db package's own bootstrap (db.go) and transaction boundary (tx.go),
 // package main, and the webtest harness (the composition root for tests,
 // playing main's role). Hand-written code mid-call-tree must take a
 // db.Queryable instead — reaching for the pool there is how reads silently
-// escape transactions.
+// escape transactions. Other generated files get no exemption: templ output
+// comes from hand-written sources, so a pool reference there is still a
+// hand-written pool reference.
 package connconfine
 
 import (
@@ -17,9 +19,12 @@ import (
 
 var Analyzer = &analysis.Analyzer{
 	Name: "connconfine",
-	Doc:  "reports db.Conn references outside generated files, db bootstrap, and package main",
+	Doc:  "reports db.Conn references outside conn.gen.go, db bootstrap, and package main",
 	Run:  run,
 }
+
+// genFileName must match cmd/conngen's output filename.
+const genFileName = "conn.gen.go"
 
 var allowedDBFiles = map[string]bool{
 	"db.go": true,
@@ -32,11 +37,11 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 
 	for _, file := range pass.Files {
-		if ast.IsGenerated(file) {
+		filename := filepath.Base(pass.Fset.Position(file.Pos()).Filename)
+		if filename == genFileName {
 			continue
 		}
 
-		filename := filepath.Base(pass.Fset.Position(file.Pos()).Filename)
 		if pass.Pkg.Name() == "db" && allowedDBFiles[filename] {
 			continue
 		}
@@ -49,7 +54,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 			if isPoolVar(pass.TypesInfo.Uses[id]) {
 				pass.Reportf(id.Pos(),
-					"db.Conn referenced outside generated delegates and db bootstrap: take a db.Queryable parameter instead")
+					"db.Conn referenced outside conn.gen.go and db bootstrap: take a db.Queryable parameter instead")
 			}
 
 			return true

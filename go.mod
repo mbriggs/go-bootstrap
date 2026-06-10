@@ -1,6 +1,6 @@
 module github.com/mbriggs/go-bootstrap
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/a-h/templ v0.3.1020
@@ -11,9 +11,16 @@ require (
 	github.com/labstack/echo/v4 v4.15.2
 	github.com/mbriggs/pgsql v0.0.0-20240612125641-eaf99511f4a5
 	github.com/muesli/termenv v0.16.0
+	github.com/pressly/goose/v3 v3.27.1
 	golang.org/x/crypto v0.53.0
 	golang.org/x/tools v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+	github.com/mfridman/interpolate v0.0.2 // indirect
+	github.com/sethvargo/go-retry v0.3.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 )
 
 require (

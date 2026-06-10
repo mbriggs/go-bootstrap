@@ -1,15 +1,3 @@
-# Project conventions
-
-Batteries-included Go web service template: Echo + pgx + tern migrations,
-templ server rendering with scs sessions, schema-first code generation,
-custom lint analyzers, and an integration test harness with
-database-per-package isolation.
-
-Read STANDARDS.md before writing code — it defines the conventions and
-which ones are machine-enforced. docs/SYSTEM-MAP.md is the structural
-map: boot sequence, request lifecycle, codegen flows, and which tool
-enforces which invariant.
-
 ## Workflow
 
 - `bin/check` must pass before any unit of work is done. It runs gofumpt,
@@ -17,12 +5,12 @@ enforces which invariant.
   drift, the codegen drift check, and the test suite. `bin/vuln-check` runs
   govulncheck separately because vulnerability database results can change
   without a code change.
-- Schema changes: `bin/migration <name>` → write SQL → `tern migrate` →
+- Schema changes: `bin/migration <name>` → write SQL → `bin/migrate up` →
   update `modelgen.yaml` if a new table → `bin/generate` → commit the
-  generated output. Never hand-edit `*_gen.go`.
+  generated output. Never hand-edit `*.gen.go`.
 - Persistence: hand-write only `FooTx(ctx, tx db.Queryable, ...)` forms;
-  `bin/generate` emits the bare delegates. Never reference `db.Conn` in
-  hand-written code.
+  `bin/generate` emits the direct `db.Conn` variants. Never reference
+  `db.Conn` in hand-written code.
 - Views: edit `.templ` sources under `views/`, then `bin/generate` (air does
   this in the dev loop). Never hand-edit `*_templ.go`. Compose pages from
   design-system components from `github.com/mbriggs/gesso/ui` — browse
@@ -34,6 +22,17 @@ enforces which invariant.
   `func TestMain(m *testing.M) { webtest.Main(m) }`. Run `bin/testdb`
   once (and after migration changes) to build the template database.
   Tests touching only their own uniquely-named rows call `t.Parallel()`.
+
+## Logging
+
+- One named logger per package: `var logger = logging.Logger("mypackage")`;
+  runtime filtering via the settings DSL (`"_all,-db:debug"`). No leftover
+  debugging — the leveled logger *is* the debug mechanism; if a line isn't
+  worth keeping at `Debug` level, it isn't worth committing.
+
+## Style
+- `any`, not `interface{}`. Dot-imports only for `webtest` in test files.
+  Match the file you're editing.
 
 ## Environment
 

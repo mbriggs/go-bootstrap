@@ -1,5 +1,5 @@
 # Tables modelgen generates models for. The live schema is the source of
-# truth — run bin/generate after tern migrate.
+# truth — run bin/generate after bin/migrate up.
 tables:
   - table: users
     package: auth

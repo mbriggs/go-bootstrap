@@ -1,0 +1,14 @@
+---
+title: Package Shape
+claudePaths:
+  - "**/*.go"
+---
+
+The package is the default unit of organization; a struct earns its place
+by modelling a stateful process. Before creating a new package, adding a
+service/repository/manager struct, or threading a dependency through a
+constructor, use the repo skill `go-package-shape` at
+`skills/go-package-shape/SKILL.md` — it carries the layout rules
+(context directories with aggregate packages inside, mechanism vs.
+domain, file-by-topic within a package, right-sizing), and when DI is
+earned.

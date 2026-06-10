@@ -3,16 +3,24 @@ title: Schema and Codegen Workflow
 claudePaths:
   - "migrations/**"
   - "modelgen.yaml"
+  - "cmd/modelgen/**"
+  - "cmd/conngen/**"
 ---
 
-The schema is the source of truth. The flow for any schema change:
+The schema is the source of truth: migrations are hand-authored SQL, the
+Go model is generated from the live database, never typed by hand. The
+flow for any schema change:
 
 1. `bin/migration <name>` and write the SQL.
-2. `tern migrate` against the dev database.
+2. `bin/migrate up` against the dev database.
 3. New table? Add it to `modelgen.yaml` (`table` / `package` / `type`).
 4. `bin/generate` — modelgen introspects the live schema into model structs;
-   txgen emits bare delegates for `FooTx` functions.
+   conngen emits the direct `db.Conn` variants of `FooTx` functions.
 5. `bin/testdb` to rebuild the test template, then commit the generated
    output. `bin/check` fails on drift.
 
-Never hand-edit `*_gen.go`.
+Never hand-edit `*.gen.go`. Generation is a deliberate act — never wired
+into builds or the air loop, so builds and fresh clones never need a
+database; generated output is committed and drift-checked. A generator
+must stay *boring*: introspect, map, emit. The moment one needs runtime
+cleverness, the cleverness belongs in `db` as mechanism.

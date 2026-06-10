@@ -1,3 +1,10 @@
+// Package logging provides named, per-package slog loggers with runtime
+// level control. Each package declares its own logger once
+// (var logger = logging.Logger("mypackage")), and Configure adjusts
+// levels across all of them at once using a settings DSL
+// ("MyClass:debug,-DisabledClass,_all"), so verbosity can be tuned per
+// package without touching call sites. The leveled logger is the debug
+// mechanism — there is no separate debug-print facility.
 package logging
 
 import (

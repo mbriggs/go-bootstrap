@@ -1,17 +1,21 @@
 # go-bootstrap
 
 A batteries-included starting point for Go web services: Echo + pgx +
-hand-written SQL migrations (tern) + templ server rendering with scs
+hand-written SQL migrations (goose) + templ server rendering with scs
 sessions, password auth, and the [gesso](https://github.com/mbriggs/gesso)
-design system (browse it at `/design`), with the conventions from
-[STANDARDS.md](STANDARDS.md) wired in as working tooling — schema-first
-code generation, custom lint analyzers, an integration test harness with
-database-per-package isolation, per-worktree environment isolation, and
-generated agent configuration.
+design system (browse it at `/design`), with the project's conventions
+wired in as working tooling — schema-first code generation, custom lint
+analyzers, an integration test harness with database-per-package
+isolation, per-worktree environment isolation, and generated agent
+configuration.
 
+The bias throughout is simple, ergonomic Go: packages by default, structs
+where there is state to model, essential mess isolated, accidental
+complexity eliminated. [CLAUDE.md](CLAUDE.md) carries the philosophy;
+each convention's reasoning lives in its skill under [skills/](skills/).
 [docs/SYSTEM-MAP.md](docs/SYSTEM-MAP.md) is the structural map — boot
 sequence, request lifecycle, codegen flows, and which tool enforces which
-invariant. [STANDARDS.md](STANDARDS.md) is the reasoning behind them.
+invariant.
 
 ## Start a project
 
@@ -46,7 +50,7 @@ generated `.env` — so there is nothing to rename beyond what `gonew` does.
 
 ```sh
 bin/migration add_things_table   # write the SQL, then:
-tern migrate
+bin/migrate up
 # add the table to modelgen.yaml:
 #   - table: things
 #     package: thing
@@ -55,8 +59,9 @@ bin/generate                     # model struct + ToRowMap from the schema
 ```
 
 Hand-write only `FooTx(ctx, tx db.Queryable, ...)` persistence functions in
-the new package; `bin/generate` emits the pool-backed bare forms. See
-[STANDARDS.md](STANDARDS.md) for the conventions and the reasoning.
+the new package; `bin/generate` emits the pool-backed bare forms. See the
+[go-tx-pattern](skills/go-tx-pattern/SKILL.md) skill for the conventions
+and the reasoning.
 
 ## Worktrees
 
@@ -88,11 +93,11 @@ skills live in `skills/`. The Claude stop hook runs the drift check plus
 | `logging/`       | Named per-package loggers with runtime filter DSL                 |
 | `webtest/`       | Integration harness: template-DB-per-package, wired server, cookie client |
 | `partition/`     | Split batch parse results into values + failures                  |
-| `fixtureid/`     | Deterministic fixture ids clear of serial-pk ranges               |
-| `testdata/`      | Concurrency-safe unique-name sequences for fixtures               |
+| `fixture/`       | Test-data identity: deterministic fixture ids, unique-name sequences |
 | `cmd/modelgen`   | Schema → model codegen (drift-checked, committed output)          |
-| `cmd/txgen`      | `FooTx` → pool-delegate codegen                                   |
+| `cmd/conngen`    | `FooTx` → direct `db.Conn` variant codegen                        |
 | `cmd/createuser` | Provision the first login from the CLI                            |
+| `cmd/migrate`    | goose migrations against the PG* environment (`bin/migrate`)      |
 | `cmd/lint`       | Custom analyzers: `txparam`, `connconfine`                        |
 | `ai/`, `skills/` | Sources for generated agent config + repo-owned skills            |
 | `bin/`           | check, generate, testdb, recreate, migration, setup, coverage, vuln-check, worktree + port tools, agent-config sync |

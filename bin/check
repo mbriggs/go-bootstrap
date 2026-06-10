@@ -27,19 +27,21 @@ else
 fi
 
 # go.mod tidy drift — run tidy against a throwaway copy so the check stays
-# read-only.
+# read-only. The copied .mise.toml lands at a path mise has never trusted,
+# which makes shim-resolved tools refuse to run; the copy is identical to
+# the repo's already-trusted config, so trust it for this command.
 tidydir="$(mktemp -d)"
 trap 'rm -rf "$tidydir"' EXIT
 rsync -a --exclude .git --exclude tmp . "$tidydir/repo/"
 cp go.mod go.sum "$tidydir/"
-(cd "$tidydir/repo" && go mod tidy)
+(cd "$tidydir/repo" && MISE_TRUSTED_CONFIG_PATHS="$tidydir" go mod tidy)
 diff -u "$tidydir/go.mod" "$tidydir/repo/go.mod"
 diff -u "$tidydir/go.sum" "$tidydir/repo/go.sum"
 
 # Stale = regeneration changed something the index doesn't have: untracked
 # new output (??) or a worktree modification (second status column set).
 bin/generate
-drift=$(git status --porcelain -- '*_gen.go' '*_templ.go' | grep -E '^(\?\?|.[^ ])' || true)
+drift=$(git status --porcelain -- '*.gen.go' '*_templ.go' | grep -E '^(\?\?|.[^ ])' || true)
 if [ -n "$drift" ]; then
   echo "generated code is stale or untracked — commit bin/generate output:"
   echo "$drift"

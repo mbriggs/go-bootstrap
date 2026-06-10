@@ -1,8 +1,8 @@
 // Package db is the generic data-access mechanism: typed queries over any
 // Queryable (pool or transaction), transaction boundaries, and row-map
 // helpers. Domain packages own their SQL; this package owns how SQL runs.
-// The pool global Conn is confined by lint to generated delegates, this
-// package's bootstrap, and package main.
+// The pool global Conn is confined by lint to generated conn.gen.go files,
+// this package's bootstrap, and package main.
 package db
 
 import (

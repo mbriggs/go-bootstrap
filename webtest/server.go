@@ -19,6 +19,7 @@ var configureWeb sync.Once
 // Safe under t.Parallel: the web package is configured once per test
 // process.
 func Server(ctx context.Context) *echo.Echo {
+	// ensure the web package is configured once per test process.
 	configureWeb.Do(func() { web.Configure(db.Conn, env.Test) })
 	return web.Router(ctx, "public")
 }

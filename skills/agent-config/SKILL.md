@@ -49,7 +49,9 @@ Claude's post-edit hook runs sync automatically. The shared stop hook runs
 
 ## What Goes Where
 
-- Machine-enforced conventions and their rationale → `STANDARDS.md`.
-- Short always-loaded invariants → `ai/common/`.
+- Philosophy and short always-loaded invariants → `ai/common/`.
+- A convention's policy and rationale → the skill that owns it,
+  `skills/<name>/SKILL.md`.
 - Path-scoped pointers into skills → `ai/rules/`.
-- Procedural, task-triggered guidance → `skills/<name>/SKILL.md`.
+- The structural *where* (boot, request flow, enforcement map, tooling) →
+  `docs/SYSTEM-MAP.md`.

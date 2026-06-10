@@ -2,14 +2,14 @@
 #
 # Regenerates all generated code. The directives in gen.go are the source
 # of truth; this script exists so the workflow reads bin/<verb> like the
-# rest of the toolchain. Run after tern migrate or after adding/removing a
+# rest of the toolchain. Run after bin/migrate up or after adding/removing a
 # FooTx. Output is committed; bin/check fails if it drifts.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# templ first: txgen type-checks every package, so *_templ.go must be
-# current before go generate runs modelgen + txgen.
+# templ first: conngen type-checks every package, so *_templ.go must be
+# current before go generate runs modelgen + conngen.
 templ generate
 
 go generate .

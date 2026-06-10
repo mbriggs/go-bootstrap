@@ -10,4 +10,4 @@ if [ $# -ne 1 ]; then
   exit 1
 fi
 
-tern new -m "${TERN_MIGRATIONS:-migrations}" "$1"
+go run ./cmd/migrate create "$1"

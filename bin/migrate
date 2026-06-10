@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#
+# Runs migrations via cmd/migrate (goose against the PG* environment):
+# bin/migrate up | up-by-one | down | redo | reset | status | version
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+go run ./cmd/migrate "$@"

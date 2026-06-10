@@ -13,8 +13,8 @@ import (
 
 // Sessions is the process-wide scs session manager, backed by the sessions
 // table. Like db.Conn it is a thread-safe single-instance resource, so it
-// lives as a global (see STANDARDS.md); main and webtest call Configure
-// once at boot before building the router.
+// lives as a global; main and webtest call Configure once at boot before
+// building the router.
 var Sessions *scs.SessionManager
 
 // devMode loosens the error page (full detail + copy button) in

@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/mbriggs/go-bootstrap/testdata"
+	"github.com/mbriggs/go-bootstrap/fixture"
 )
 
 // MakePassword is the known cleartext for factory users — tests that sign
 // in through the UI need it.
 const MakePassword = "factory-pw"
 
-var makeSeq = testdata.NewSequence()
+var makeSeq = fixture.NewSequence()
 
 // MakeOption customizes the user Make inserts.
 type MakeOption func(*CreateInput)

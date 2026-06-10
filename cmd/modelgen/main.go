@@ -120,7 +120,7 @@ func generate(ctx context.Context, conn *pgx.Conn, table TableConfig) error {
 		return err
 	}
 
-	path := filepath.Join(table.Package, "model_gen.go")
+	path := filepath.Join(table.Package, "model.gen.go")
 
 	out, err := imports.Process(path, src, nil)
 	if err != nil {

@@ -14,8 +14,8 @@ dropdb --if-exists "$PGDATABASE"
 createdb "$PGDATABASE"
 
 echo "Running migration..."
-if ls "${TERN_MIGRATIONS:-migrations}"/*.sql >/dev/null 2>&1; then
-  tern migrate
+if ls migrations/*.sql >/dev/null 2>&1; then
+  go run ./cmd/migrate up
 else
   echo "no migrations yet — database is empty"
 fi
