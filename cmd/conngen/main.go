@@ -4,6 +4,13 @@
 // Foo form that supplies db.Conn is emitted here, so hand-written code never
 // references the pool mid-call-tree and the variant cannot drift.
 //
+// Generation is purely syntax-driven — no type-checking. That is load-bearing:
+// a caller of a bare variant is expected to be broken until this generator
+// emits it (write FooTx, call Foo, generate), so requiring the tree to
+// type-check would make generation impossible exactly when it's needed.
+// Recognizing the convention only takes the source text of the signature, and
+// the build that follows bin/generate is the gate for real breakage.
+//
 // Usage: go run ./cmd/conngen ./db ./docindex
 package main
 
@@ -30,9 +37,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Syntax only — never NeedTypes; see the package comment for why.
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax |
-			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedCompiledGoFiles,
+			packages.NeedCompiledGoFiles,
 	}
 
 	pkgs, err := packages.Load(cfg, os.Args[1:]...)
@@ -40,6 +48,8 @@ func main() {
 		fatalf("loading packages: %v", err)
 	}
 
+	// With a syntax-only load these are parse and list errors — without
+	// syntax there is nothing to generate from, so they stay fatal.
 	if packages.PrintErrors(pkgs) > 0 {
 		os.Exit(1)
 	}
@@ -84,7 +94,7 @@ func generate(pkg *packages.Package) error {
 				continue
 			}
 
-			txField := queryableField(pkg, fn)
+			txField := queryableField(file, pkg.Name, fn)
 			if txField == -1 {
 				continue
 			}
@@ -145,14 +155,9 @@ func removeStale(dir string) error {
 
 // queryableField returns the index of the db.Queryable parameter field,
 // or -1 when the function does not follow the FooTx convention.
-func queryableField(pkg *packages.Package, fn *ast.FuncDecl) int {
+func queryableField(file *ast.File, pkgName string, fn *ast.FuncDecl) int {
 	for i, field := range fn.Type.Params.List {
-		t := pkg.TypesInfo.TypeOf(field.Type)
-		if t == nil {
-			continue
-		}
-
-		if strings.HasSuffix(t.String(), "db.Queryable") || t.String() == "Queryable" {
+		if isQueryable(file, pkgName, field.Type) {
 			if len(field.Names) != 1 {
 				return -1
 			}
@@ -162,6 +167,44 @@ func queryableField(pkg *packages.Package, fn *ast.FuncDecl) int {
 	}
 
 	return -1
+}
+
+// isQueryable recognizes the seam type from source text: a bare Queryable
+// inside the db package itself, or Queryable selected off an import of a
+// package named db (resolved through the file's import aliases, so module
+// renames via gonew keep working).
+func isQueryable(file *ast.File, pkgName string, expr ast.Expr) bool {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return pkgName == "db" && t.Name == "Queryable"
+	case *ast.SelectorExpr:
+		x, ok := t.X.(*ast.Ident)
+		if !ok || t.Sel.Name != "Queryable" {
+			return false
+		}
+
+		return strings.HasSuffix(importPath(file, x.Name), "/db")
+	}
+
+	return false
+}
+
+// importPath resolves a local package name to its import path within file.
+func importPath(file *ast.File, local string) string {
+	for _, imp := range file.Imports {
+		path := strings.Trim(imp.Path.Value, `"`)
+
+		name := path[strings.LastIndex(path, "/")+1:]
+		if imp.Name != nil {
+			name = imp.Name.Name
+		}
+
+		if name == local {
+			return path
+		}
+	}
+
+	return ""
 }
 
 func render(pkg *packages.Package, fn *ast.FuncDecl, txField int) (string, error) {
@@ -196,22 +239,53 @@ func render(pkg *packages.Package, fn *ast.FuncDecl, txField int) (string, error
 	return b.String(), nil
 }
 
+// alreadyDefined reports whether name is hand-written at the top level of
+// the package (the generated file doesn't count — conngen owns that).
 func alreadyDefined(pkg *packages.Package, name string) bool {
-	obj := pkg.Types.Scope().Lookup(name)
-	if obj == nil {
-		return false
-	}
-
-	return filepath.Base(pkg.Fset.Position(obj.Pos()).Filename) != genFileName
+	return declaresTopLevel(pkg, name)
 }
 
 // connExpr is unqualified inside the package that declares the pool.
 func connExpr(pkg *packages.Package) string {
-	if obj := pkg.Types.Scope().Lookup("Conn"); obj != nil {
+	if declaresTopLevel(pkg, "Conn") {
 		return "Conn"
 	}
 
 	return "db.Conn"
+}
+
+func declaresTopLevel(pkg *packages.Package, name string) bool {
+	for i, file := range pkg.Syntax {
+		if filepath.Base(pkg.CompiledGoFiles[i]) == genFileName {
+			continue
+		}
+
+		for _, decl := range file.Decls {
+			switch d := decl.(type) {
+			case *ast.FuncDecl:
+				if d.Recv == nil && d.Name.Name == name {
+					return true
+				}
+			case *ast.GenDecl:
+				for _, spec := range d.Specs {
+					switch s := spec.(type) {
+					case *ast.TypeSpec:
+						if s.Name.Name == name {
+							return true
+						}
+					case *ast.ValueSpec:
+						for _, n := range s.Names {
+							if n.Name == name {
+								return true
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func printFields(fset *token.FileSet, fields []*ast.Field, skip int) (string, error) {

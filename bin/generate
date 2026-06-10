@@ -8,8 +8,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# templ first: conngen type-checks every package, so *_templ.go must be
-# current before go generate runs modelgen + conngen.
+# templ first so a single run leaves everything fresh; nothing downstream
+# type-checks, so the order is convenience, not correctness.
 templ generate
 
 go generate .
