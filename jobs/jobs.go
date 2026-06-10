@@ -40,8 +40,9 @@ func Configure(pool *pgxpool.Pool, baseURL string) error {
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: 10},
 		},
-		Workers: workers,
-		Logger:  logger,
+		Workers:      workers,
+		Logger:       logger,
+		ErrorHandler: sentryErrorHandler{},
 	})
 	if err != nil {
 		return fmt.Errorf("creating river client: %w", err)

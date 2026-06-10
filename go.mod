@@ -8,6 +8,7 @@ require (
 	github.com/alexedwards/scs/v2 v2.9.0
 	github.com/charmbracelet/log v1.0.0
 	github.com/exaring/otelpgx v0.11.1
+	github.com/getsentry/sentry-go v0.46.2
 	github.com/inngest/inngestgo v0.15.1
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/labstack/echo/v4 v4.15.2
@@ -16,6 +17,7 @@ require (
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/riverqueue/river v0.39.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.39.0
+	github.com/riverqueue/river/rivertype v0.39.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho v0.69.0
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.44.0
@@ -47,7 +49,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/riverqueue/river/riverdriver v0.39.0 // indirect
 	github.com/riverqueue/river/rivershared v0.39.0 // indirect
-	github.com/riverqueue/river/rivertype v0.39.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect

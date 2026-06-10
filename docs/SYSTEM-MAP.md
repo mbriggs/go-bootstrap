@@ -16,18 +16,22 @@ convention's policy and reasoning lives in its skill under
 3. `telemetry.Configure` — OTLP tracing when
    `OTEL_EXPORTER_OTLP_ENDPOINT` is set, the global no-op provider
    otherwise; shutdown flushes spans on exit.
-4. `db.Configure` — opens the `pgxpool` (with the otelpgx query tracer)
+4. `telemetry.ConfigureSentry` — error tracking when `SENTRY_DSN` is set,
+   no-op captures otherwise; 5xx responses report from `web/errors.go`,
+   discarded jobs and job panics from `jobs/errors.go`; shutdown flushes
+   pending events on exit.
+5. `db.Configure` — opens the `pgxpool` (with the otelpgx query tracer)
    and sets the `db.Conn` global (the only place outside generated code
    allowed to touch it; the `connconfine` analyzer enforces that).
-5. `web.Configure(db.Conn, cfg.AppEnv)` — builds `web.Sessions`
+6. `web.Configure(db.Conn, cfg.AppEnv)` — builds `web.Sessions`
    (scs + pgxstore), keeps the pool for `/ready`, and latches dev/prod
    mode for error detail and the design gallery.
-6. `jobs.Configure(db.Conn, cfg.BaseURL)` + `jobs.Start` — the River
+7. `jobs.Configure(db.Conn, cfg.BaseURL)` + `jobs.Start` — the River
    client and its workers (webtest configures without starting).
-7. `web.Router(ctx, cfg.PublicDir)` — panics if Configure was skipped.
-8. `flows.Configure()` — the Inngest client and durable functions; main
+8. `web.Router(ctx, cfg.PublicDir)` — panics if Configure was skipped.
+9. `flows.Configure()` — the Inngest client and durable functions; main
    mounts the returned handler at `/api/inngest`.
-9. `http.Server` with full timeouts (header/read/write/idle); binds
+10. `http.Server` with full timeouts (header/read/write/idle); binds
    `localhost:PORT` in dev, `:PORT` otherwise; SIGTERM/Ctrl-C drains HTTP
    for up to 15s, then drains job workers.
 
@@ -53,7 +57,8 @@ liveness; `/ready` pings Postgres for readiness.
 
 Handlers return errors; `errorHandler` (`web/errors.go`) is the one place
 that shapes them — templ error page for HTML clients, `apierror` JSON
-otherwise, stack detail (and a copy button) only in dev, 5xx logged.
+otherwise, stack detail (and a copy button) only in dev, 5xx logged and
+reported to Sentry when `SENTRY_DSN` is set.
 
 Full pages render through `web.RenderPage` (`web/render.go`): handler
 builds a `views.*Page` DTO, the layout (`views/layout.templ`) adds flash,

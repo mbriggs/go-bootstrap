@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/labstack/echo/v4"
 
 	"github.com/mbriggs/go-bootstrap/logging"
@@ -36,6 +38,7 @@ func errorHandler(err error, c echo.Context) {
 			"uri", c.Request().RequestURI,
 			"error", err,
 		)
+		captureError(err, c)
 	}
 
 	if !wantsHTML(c.Request()) {
@@ -73,4 +76,21 @@ func errorHandler(err error, c echo.Context) {
 
 func wantsHTML(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept"), "text/html")
+}
+
+// captureError reports a 5xx to Sentry — a no-op until
+// telemetry.ConfigureSentry has installed a client (webtest never does).
+// The hub is cloned per capture because the global hub's scope stack is
+// not safe for concurrent requests. Only the user id goes on the event;
+// SetRequest already scrubs cookies and auth headers.
+func captureError(err error, c echo.Context) {
+	hub := sentry.CurrentHub().Clone()
+	hub.Scope().SetRequest(c.Request())
+	hub.Scope().SetTag("request_id", c.Response().Header().Get(echo.HeaderXRequestID))
+
+	if u := CurrentUser(c); u != nil {
+		hub.Scope().SetUser(sentry.User{ID: strconv.FormatInt(u.ID, 10)})
+	}
+
+	hub.CaptureException(err)
 }

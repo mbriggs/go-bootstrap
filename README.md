@@ -10,8 +10,10 @@ harness with database-per-package isolation, per-worktree environment
 isolation, and generated agent configuration. Background jobs ride
 [River](https://riverqueue.com) (transactional enqueue on the same
 Postgres), durable multi-step orchestration rides
-[Inngest](https://www.inngest.com) (`flows/`), and OpenTelemetry tracing
-lights up when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+[Inngest](https://www.inngest.com) (`flows/`), OpenTelemetry tracing
+lights up when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, and Sentry error
+tracking lights up when `SENTRY_DSN` is set (5xx responses, discarded
+jobs, and job panics report automatically).
 
 The bias throughout is simple, ergonomic Go: packages by default, structs
 where there is state to model, essential mess isolated, accidental
@@ -110,7 +112,7 @@ skills live in `skills/`. The Claude stop hook runs the drift check plus
 | `jobs/`          | Background jobs (River): transactional enqueue, workers as transport  |
 | `flows/`         | Durable orchestration (Inngest): checkpointed steps, sleeps, event waits |
 | `mailer/`        | Outbound-email seam; dev sender logs, production swaps `mailer.Outbox` |
-| `telemetry/`     | OTLP tracing, env-gated; otelecho + otelpgx instrumentation           |
+| `telemetry/`     | OTLP tracing + Sentry error tracking, both env-gated; otelecho + otelpgx instrumentation |
 | `views/`         | templ layout + pages (`LayoutData`, signin, home, error)          |
 | ([gesso](https://github.com/mbriggs/gesso)) | Design system dependency: templ components + embedded assets, browse at `/design` |
 | `public/`        | Static assets served at `/public` (minimal `app.css`)             |

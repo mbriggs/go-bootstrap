@@ -54,6 +54,18 @@ func run() error {
 		}
 	}()
 
+	sentryFlush, err := telemetry.ConfigureSentry(string(cfg.AppEnv))
+	if err != nil {
+		return fmt.Errorf("configuring sentry: %w", err)
+	}
+	defer func() {
+		flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := sentryFlush(flushCtx); err != nil {
+			logger.Error("flushing sentry events", slog.Any("err", err))
+		}
+	}()
+
 	if err := db.Configure(ctx, ""); err != nil {
 		return err
 	}
