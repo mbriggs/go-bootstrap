@@ -11,7 +11,7 @@ templ Layout(data LayoutData, body templ.Component) {
 			<title>{ data.Title }</title>
 			<link rel="stylesheet" href={ ui.AssetPath("ui.css") }/>
 			<link rel="stylesheet" href="/public/app.css"/>
-			<script>document.documentElement.classList.add("js");</script>
+			<script nonce={ templ.GetNonce(ctx) }>document.documentElement.classList.add("js");</script>
 			@ui.ImportMap()
 			<script type="module" src={ ui.AssetPath("ui.js") }></script>
 			if data.HeadExtras != nil {

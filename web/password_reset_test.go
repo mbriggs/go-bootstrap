@@ -146,6 +146,49 @@ func TestPasswordResetConfirmRejectsShortPassword(t *testing.T) {
 	}
 }
 
+func TestPasswordResetSignsOutLiveSessions(t *testing.T) {
+	ctx := t.Context()
+
+	user, err := auth.Make(ctx)
+	if err != nil {
+		t.Fatalf("make user: %v", err)
+	}
+
+	// The attacker scenario: a session signed in before the reset (a stolen
+	// cookie behaves the same as this client).
+	stale := webtest.NewClient(t, webtest.Server(ctx))
+	if rec := stale.PostForm("/signin", signinForm(user.Email, auth.MakePassword)); rec.Code != http.StatusSeeOther {
+		t.Fatalf("signin = %d, want 303", rec.Code)
+	}
+	if rec := stale.Get("/"); rec.Code != http.StatusOK {
+		t.Fatalf("GET / signed in = %d, want 200", rec.Code)
+	}
+
+	token, _, err := auth.CreatePasswordReset(ctx, user.Email)
+	if err != nil {
+		t.Fatalf("create reset token: %v", err)
+	}
+	fresh := webtest.NewClient(t, webtest.Server(ctx))
+	rec := fresh.PostForm("/password-reset/confirm",
+		url.Values{"token": {token}, "password": {"post-reset-pw"}})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("confirm = %d, want 303", rec.Code)
+	}
+
+	// The pre-reset session is dead: its password epoch no longer matches.
+	if rec := stale.Get("/"); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/signin" {
+		t.Fatalf("GET / with pre-reset session = %d -> %q, want 303 -> /signin", rec.Code, rec.Header().Get("Location"))
+	}
+
+	// Signing in again with the new password works as normal.
+	if rec := stale.PostForm("/signin", signinForm(user.Email, "post-reset-pw")); rec.Code != http.StatusSeeOther {
+		t.Fatalf("signin after reset = %d, want 303", rec.Code)
+	}
+	if rec := stale.Get("/"); rec.Code != http.StatusOK {
+		t.Fatalf("GET / after re-signin = %d, want 200", rec.Code)
+	}
+}
+
 func TestPasswordResetBadTokenBouncesToRequestForm(t *testing.T) {
 	client := webtest.NewClient(t, webtest.Server(t.Context()))
 

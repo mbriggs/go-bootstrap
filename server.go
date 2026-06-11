@@ -18,6 +18,7 @@ import (
 	"github.com/mbriggs/go-bootstrap/flows"
 	"github.com/mbriggs/go-bootstrap/jobs"
 	"github.com/mbriggs/go-bootstrap/logging"
+	"github.com/mbriggs/go-bootstrap/mailer"
 	"github.com/mbriggs/go-bootstrap/telemetry"
 	"github.com/mbriggs/go-bootstrap/web"
 )
@@ -72,6 +73,15 @@ func run() error {
 	defer db.Close()
 
 	web.Configure(db.Conn, cfg.AppEnv)
+
+	// Swap the log Outbox for SES before any worker that sends mail starts.
+	if cfg.MailFrom != "" {
+		sender, err := mailer.NewSES(ctx, cfg.MailFrom)
+		if err != nil {
+			return fmt.Errorf("configuring ses mailer: %w", err)
+		}
+		mailer.Outbox = sender
+	}
 
 	if err := jobs.Configure(db.Conn, cfg.BaseURL); err != nil {
 		return fmt.Errorf("configuring jobs: %w", err)

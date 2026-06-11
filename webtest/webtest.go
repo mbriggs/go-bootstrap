@@ -102,7 +102,9 @@ func createTestDB(ctx context.Context, name string) error {
 	}
 	defer admin.Close(ctx)
 
-	if _, err := admin.Exec(ctx, "DROP DATABASE IF EXISTS "+name); err != nil {
+	// Database names can't be parameters in DDL; Sanitize quotes them so a
+	// surprising module path can't produce mangled SQL.
+	if _, err := admin.Exec(ctx, "DROP DATABASE IF EXISTS "+pgx.Identifier{name}.Sanitize()); err != nil {
 		return fmt.Errorf("dropping stale test db %s: %w", name, err)
 	}
 
@@ -112,7 +114,8 @@ func createTestDB(ctx context.Context, name string) error {
 	// drop-and-rename swap leaves the template absent for a few
 	// milliseconds. Anything that persists through the retries is real.
 	for attempt := 0; ; attempt++ {
-		_, err = admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", name, templateDB))
+		_, err = admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s",
+			pgx.Identifier{name}.Sanitize(), pgx.Identifier{templateDB}.Sanitize()))
 
 		if err == nil {
 			return nil
@@ -140,7 +143,7 @@ func dropTestDB(name string) {
 	}
 	defer admin.Close(ctx)
 
-	if _, err := admin.Exec(ctx, "DROP DATABASE IF EXISTS "+name); err != nil {
+	if _, err := admin.Exec(ctx, "DROP DATABASE IF EXISTS "+pgx.Identifier{name}.Sanitize()); err != nil {
 		logger.Error("could not drop test db", "db", name, "error", err)
 	}
 }

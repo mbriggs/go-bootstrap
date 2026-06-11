@@ -1,13 +1,53 @@
 package web
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/a-h/templ"
 	"github.com/labstack/echo/v5"
 )
+
+// SecureHeaders sets the browser-side defense headers on every response.
+// Scripts run only from our origin or with this request's CSP nonce —
+// templ.WithNonce carries it to the layout's inline script and gesso's
+// importmap. style-src allows inline because gesso components set style
+// attributes (progress width, max-height); a style attribute can't run
+// script, so that's an accepted trade. HSTS only in production — on
+// localhost it would pin the browser to https the dev server doesn't speak.
+func SecureHeaders(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		nonce := make([]byte, 16)
+		if _, err := rand.Read(nonce); err != nil {
+			return fmt.Errorf("generating csp nonce: %w", err)
+		}
+		n := base64.RawStdEncoding.EncodeToString(nonce)
+
+		h := c.Response().Header()
+		h.Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' 'nonce-"+n+"'; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data:; "+
+				"form-action 'self'; "+
+				"frame-ancestors 'none'; "+
+				"base-uri 'self'")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		if prodMode {
+			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+
+		c.SetRequest(c.Request().WithContext(templ.WithNonce(c.Request().Context(), n)))
+
+		return next(c)
+	}
+}
 
 // SameOriginPost rejects cross-origin POSTs (CSRF defense). Browsers send
 // Origin on POST; older or stripped requests fall back to Sec-Fetch-Site.

@@ -36,6 +36,7 @@ func TestLoadReadsOverrides(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("PORT", "9999")
 	t.Setenv("APP_URL", "https://example.com")
+	t.Setenv("MAIL_FROM", "app@example.com")
 
 	cfg, err := env.Load()
 	if err != nil {
@@ -46,6 +47,9 @@ func TestLoadReadsOverrides(t *testing.T) {
 	}
 	if cfg.BaseURL != "https://example.com" {
 		t.Fatalf("BaseURL = %q, want https://example.com", cfg.BaseURL)
+	}
+	if cfg.MailFrom != "app@example.com" {
+		t.Fatalf("MailFrom = %q, want app@example.com", cfg.MailFrom)
 	}
 }
 
@@ -66,9 +70,21 @@ func TestLoadDefaultsBaseURLToLocalhostInDev(t *testing.T) {
 func TestLoadRequiresAppURLInProduction(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("APP_URL", "")
+	t.Setenv("MAIL_FROM", "app@example.com")
 
 	_, err := env.Load()
 	if !errors.Is(err, env.ErrAppURLRequired) {
 		t.Fatalf("err = %v, want ErrAppURLRequired", err)
+	}
+}
+
+func TestLoadRequiresMailFromInProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("APP_URL", "https://example.com")
+	t.Setenv("MAIL_FROM", "")
+
+	_, err := env.Load()
+	if !errors.Is(err, env.ErrMailFromRequired) {
+		t.Fatalf("err = %v, want ErrMailFromRequired", err)
 	}
 }

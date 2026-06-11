@@ -15,8 +15,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/mbriggs/go-bootstrap/db"
 	"github.com/mbriggs/pgsql"
 )
@@ -83,13 +81,13 @@ func ResetPasswordTx(ctx context.Context, tx db.Queryable, token, password strin
 		return User{}, err
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	hash, err := hashPassword(ctx, password)
 	if err != nil {
 		return User{}, fmt.Errorf("hashing password: %w", err)
 	}
 
 	_, err = db.UpdateTx(ctx, tx, pgsql.Update("users").
-		Setf("password_hash = ?, updated_at = now()", string(hash)).
+		Setf("password_hash = ?, updated_at = now()", hash).
 		Where("id = ?", row.UserID))
 	if err != nil {
 		return User{}, fmt.Errorf("updating password: %w", err)

@@ -1,8 +1,8 @@
 // Package mailer is the outbound-email seam. Email is an external service
 // the app shouldn't be coupled to, so the seam is earned: the default
-// sender logs the message — right for development and tests — and
-// production swaps in a real provider at boot, before any worker that
-// sends mail starts.
+// sender logs the message — right for development and tests — and main
+// swaps in the SES sender at boot when MAIL_FROM is set, before any worker
+// that sends mail starts.
 //
 // Sending belongs in a background job, not a request handler: enqueue
 // through the jobs package in the same transaction as the state change the
@@ -32,9 +32,8 @@ type Sender interface {
 	Send(ctx context.Context, msg Message) error
 }
 
-// Outbox is the process-wide sender. Swap it at boot for a real provider:
-//
-//	mailer.Outbox = postmark.New(apiKey)
+// Outbox is the process-wide sender. main swaps it at boot for the real
+// provider (see NewSES); everything else sends through it blindly.
 var Outbox Sender = logSender{}
 
 // Send delivers msg through the configured Outbox.

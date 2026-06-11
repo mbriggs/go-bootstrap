@@ -63,6 +63,9 @@ func SigninSubmit(c *echo.Context) error {
 		return fmt.Errorf("renewing session: %w", err)
 	}
 	Sessions.Put(ctx, "user_id", user.ID)
+	// LoadUser kills the session when this stops matching, so a password
+	// change signs out every session that signed in before it.
+	Sessions.Put(ctx, "password_epoch", user.PasswordEpoch())
 
 	return SafeRedirect(c, Sessions.PopString(ctx, "after_signin"))
 }

@@ -48,15 +48,19 @@ and clears them via `web.TakeFlash`.
 - `web.CurrentUser(c)` returns the user attached by `LoadUser`, or nil.
 - On signin success, call `web.Sessions.RenewToken(ctx)` before
   `Put("user_id", …)` so the session id rotates and fixation can't ride a
-  pre-login cookie.
+  pre-login cookie, and `Put("password_epoch", user.PasswordEpoch())` —
+  `LoadUser` destroys any session whose epoch no longer matches, which is
+  what signs every session out when the password changes.
 - `auth.Authenticate` collapses unknown-email and bad-password into the same
-  `auth.ErrInvalidCredentials` — don't distinguish them at the wire. Signin
-  failures are throttled per (IP, email); record outcomes via the existing
-  pattern in `SigninSubmit` if you add other credential checks. The layered
-  defense: bcrypt at cost 12 slows offline cracking (signin is rare, ~100ms
-  is tolerable), the throttle slows online guessing. Throttle attempts
-  live in Postgres (`throttle_attempts`), so the limit holds across
-  processes; `web/throttle.go` owns the policy and the `*Tx` queries.
+  `auth.ErrInvalidCredentials` — don't distinguish them at the wire (it
+  burns a decoy hash compare on unknown email so the two are
+  timing-uniform too). Signin failures are throttled per (IP, email);
+  record outcomes via the existing pattern in `SigninSubmit` if you add
+  other credential checks. The layered defense: argon2id at OWASP params
+  slows offline cracking (signin is rare, ~50ms is tolerable), the
+  throttle slows online guessing. Throttle attempts live in Postgres
+  (`throttle_attempts`), so the limit holds across processes;
+  `web/throttle.go` owns the policy and the `*Tx` queries.
 - Gate on arbitrary predicates with `web.RequirePolicy(policy)`; policies
   live next to the domain they protect and return an error explaining the
   denial (logged, never rendered).

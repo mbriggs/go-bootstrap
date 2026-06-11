@@ -43,8 +43,9 @@ args, or persisting progress flags a worker checks.
 - Register workers in `jobs.Configure`, flows in `flows.Configure` —
   both before anything serves.
 - Outbound email goes through the `mailer` seam (`mailer.Send`) from a
-  worker or flow step. The default sender logs; production swaps
-  `mailer.Outbox` at boot.
+  worker or flow step. The default sender logs; main swaps `mailer.Outbox`
+  for the SES sender at boot when `MAIL_FROM` is set (required in
+  production; region/credentials ride the standard AWS_* environment).
 - In flows, side effects live inside `step.Run` so they're checkpointed
   and retried per-step; sleeps use `step.Sleep` (they survive deploys —
   Inngest re-invokes and replays recorded step results).

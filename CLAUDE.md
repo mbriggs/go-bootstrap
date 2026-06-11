@@ -111,7 +111,9 @@ the justification lives in the skill that owns the convention.
   variable families are the exception: PG* (pgx), OTEL_* (OpenTelemetry;
   tracing turns on with `OTEL_EXPORTER_OTLP_ENDPOINT`), SENTRY_* (error
   tracking turns on with `SENTRY_DSN`; 5xx responses and discarded jobs
-  report automatically), INNGEST_* (`INNGEST_DEV=1` in development).
+  report automatically), INNGEST_* (`INNGEST_DEV=1` in development),
+  AWS_* (the SES mailer; real sending turns on with `MAIL_FROM`, which
+  production requires).
 - PG connection comes from `.env`; `bin/setup` generates it from the module
   name and mise loads it (`worktree.env` overrides it in worktrees — see
   `bin/worktree-setup` for per-worktree DB and port isolation).

@@ -41,6 +41,16 @@ func LoadUser(next echo.HandlerFunc) echo.HandlerFunc {
 			return fmt.Errorf("loading session user %d: %w", id, err)
 		}
 
+		// The password changed since this session signed in (or the session
+		// predates epochs): destroy it and continue signed out. This is what
+		// signs an attacker's stolen session out after a password reset.
+		if Sessions.GetString(ctx, "password_epoch") != user.PasswordEpoch() {
+			if err := Sessions.Destroy(ctx); err != nil {
+				return fmt.Errorf("destroying stale-epoch session: %w", err)
+			}
+			return next(c)
+		}
+
 		c.SetRequest(c.Request().WithContext(context.WithValue(ctx, ctxUserKey{}, &user)))
 
 		return next(c)

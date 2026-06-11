@@ -114,7 +114,8 @@ Two tiers, two packages, one dividing line (spelled out in `flows/flows.go`):
   example (`flows/welcome.go`), triggered by `app/user.created`, which
   `cmd/createuser` emits — so the tier demos end to end in dev.
 - `mailer/` — the outbound-email seam both use; the default sender logs,
-  production swaps `mailer.Outbox` at boot.
+  main swaps `mailer.Outbox` for SES at boot when `MAIL_FROM` is set
+  (required in production).
 
 River's schema rides goose (`migrations/003`/`004`, dumped from River's
 migration line — regenerate on River upgrades, don't hand-edit).

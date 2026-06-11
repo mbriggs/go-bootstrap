@@ -104,6 +104,43 @@ func TestCreateValidatesRequiredFields(t *testing.T) {
 	}
 }
 
+// The hash semaphore queues argon2 work past 2×GOMAXPROCS. Overcommit it
+// well beyond the cap and make sure every caller still completes — a slot
+// leak or deadlock hangs this test instead of failing quietly.
+func TestConcurrentAuthenticationsAllComplete(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	user, err := auth.Make(ctx)
+	if err != nil {
+		t.Fatalf("make user: %v", err)
+	}
+
+	const callers = 64
+	errs := make(chan error, callers)
+	for i := range callers {
+		go func() {
+			// Alternate good and bad credentials so both compare paths run.
+			password := auth.MakePassword
+			if i%2 == 1 {
+				password = "wrong-pw"
+			}
+
+			_, err := auth.Authenticate(ctx, user.Email, password)
+			if i%2 == 1 && errors.Is(err, auth.ErrInvalidCredentials) {
+				err = nil
+			}
+			errs <- err
+		}()
+	}
+
+	for range callers {
+		if err := <-errs; err != nil {
+			t.Errorf("concurrent authenticate: %v", err)
+		}
+	}
+}
+
 func TestCreateEnforcesPasswordPolicy(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -113,7 +150,7 @@ func TestCreateEnforcesPasswordPolicy(t *testing.T) {
 		t.Fatalf("err = %v, want ErrPasswordTooShort", err)
 	}
 
-	_, err = auth.Create(ctx, auth.CreateInput{Email: "long@example.com", Password: strings.Repeat("a", 73)})
+	_, err = auth.Create(ctx, auth.CreateInput{Email: "long@example.com", Password: strings.Repeat("a", 513)})
 	if !errors.Is(err, auth.ErrPasswordTooLong) {
 		t.Fatalf("err = %v, want ErrPasswordTooLong", err)
 	}

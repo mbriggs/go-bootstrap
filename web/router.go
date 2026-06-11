@@ -37,6 +37,10 @@ func Router(ctx context.Context, publicDir string) *echo.Echo {
 	// grows cross-origin consumers, add middleware.CORSWithConfig with the
 	// allowed origins spelled out.
 	e.Use(middleware.RequestID())
+	e.Use(SecureHeaders)
+	// 2 MiB bounds form posts; routes that accept uploads raise it per-route
+	// with their own BodyLimit.
+	e.Use(middleware.BodyLimit(2 << 20))
 	// Request spans no-op until telemetry.Configure installs a provider.
 	e.Use(Tracing)
 	e.Use(requestIDOnSpan)
